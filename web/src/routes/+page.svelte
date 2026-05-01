@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from "svelte";
 	import SearchIcon from "@lucide/svelte/icons/search";
 	import StarIcon from "@lucide/svelte/icons/star";
 	import SparklesIcon from "@lucide/svelte/icons/sparkles";
@@ -19,14 +20,15 @@
 	import FileCard from "$lib/components/explorer/file-card.svelte";
 
 	import {
-		FAVORITE_FILES,
-		RECENT_FILES,
-		SUGGESTED_FILES,
 		fileIconFor,
 		formatBytes,
 		formatDate,
 		type ExplorerFile,
-	} from "$lib/mock/explorer";
+	} from "$lib/types";
+	import {
+		getRecentDocuments,
+		getFavoriteDocuments,
+	} from "$lib/api";
 
 	type ViewMode = "grid" | "list";
 	type SortMode = "recent" | "name" | "size";
@@ -36,6 +38,28 @@
 	let view: ViewMode = $state("grid");
 	let sort: SortMode = $state("recent");
 	let typeFilter: TypeFilter = $state("all");
+
+	let recentFiles = $state<ExplorerFile[]>([]);
+	let favoriteFiles = $state<ExplorerFile[]>([]);
+	let suggestedFiles = $state<ExplorerFile[]>([]);
+	let loading = $state(true);
+	let error = $state("");
+
+	onMount(async () => {
+		try {
+			const [recent, favorites] = await Promise.all([
+				getRecentDocuments(),
+				getFavoriteDocuments(),
+			]);
+			recentFiles = recent;
+			favoriteFiles = favorites.length > 0 ? favorites : recent.filter((f) => f.favorite);
+			suggestedFiles = recent.filter((f) => f.suggestedReason).slice(0, 4);
+		} catch (err) {
+			error = String(err);
+		} finally {
+			loading = false;
+		}
+	});
 
 	function matchesType(file: ExplorerFile) {
 		if (typeFilter === "all") return true;
@@ -64,14 +88,14 @@
 	}
 
 	const filteredRecent = $derived.by(() =>
-		sortFiles(RECENT_FILES.filter(matchesQuery).filter(matchesType))
+		sortFiles(recentFiles.filter(matchesQuery).filter(matchesType))
 	);
 </script>
 
 <div class="flex flex-col gap-6">
 	<div class="flex flex-wrap items-start justify-between gap-4">
 		<div class="min-w-0">
-			<h1 class="text-2xl font-semibold leading-tight">Inicio</h1>
+			<h1 class="text-2xl font-semibold leading-tight">Qué gusto verte de nuevo</h1>
 		</div>
 		<div class="flex flex-wrap items-center gap-2">
 			<Button variant="outline">Importar</Button>
@@ -163,80 +187,83 @@
 				<Badge variant="outline">Tipo: {typeFilter}</Badge>
 			{/if}
 			{#if query.trim()}
-				<Badge variant="outline">Búsqueda: “{query.trim()}”</Badge>
+				<Badge variant="outline">Búsqueda: "{query.trim()}"</Badge>
 			{/if}
 		</div>
 	</div>
 
-	<section class="flex flex-col gap-3">
-		<div class="flex items-center justify-between gap-3">
-			<div class="flex items-center gap-2">
-				<ClockIcon class="text-muted-foreground size-4" />
-				<h2 class="text-lg font-semibold">Recientes</h2>
+	{#if loading}
+		<div class="text-muted-foreground py-10 text-center">Cargando…</div>
+	{:else if error}
+		<div class="text-destructive py-10 text-center">Error: {error}</div>
+	{:else}
+		<section class="flex flex-col gap-4">
+			<div class="flex items-center justify-between gap-3">
+				<div class="flex items-center gap-2 bg-pink-300 rounded-3xl px-3 py-1">
+					<ClockIcon class="size-4 text-pink-500" />
+					<h2 class="text-lg font-medium">Recientes</h2>
+				</div>
+				<Button variant="ghost" size="sm">Ver todo</Button>
 			</div>
-			<Button variant="ghost" size="sm">Ver todo</Button>
-		</div>
 
-		{#if view === "grid"}
-			<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-				{#each filteredRecent as file (file.id)}
+			{#if view === "grid"}
+				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+					{#each filteredRecent as file (file.id)}
+						<FileCard {file} />
+					{/each}
+				</div>
+			{:else}
+				<div class="flex flex-col">
+					{#each filteredRecent as file (file.id)}
+						{@const Icon = fileIconFor(file.ext)}
+						<Item variant="muted" size="sm" class="rounded-3xl">
+							<div class="flex w-full items-center gap-3">
+								<div class="bg-muted flex size-9 items-center justify-center rounded-2xl">
+									<Icon class="text-muted-foreground size-4" />
+								</div>
+								<div class="min-w-0 flex-1">
+									<div class="truncate font-medium">{file.name}</div>
+									<div class="text-muted-foreground truncate text-xs">
+										{file.locationLabel}
+									</div>
+								</div>
+								<div class="text-muted-foreground hidden text-xs md:block">
+									{formatDate(file.updatedAt)}
+								</div>
+								<div class="text-muted-foreground w-[90px] text-end text-xs">
+									{formatBytes(file.sizeBytes)}
+								</div>
+							</div>
+						</Item>
+					{/each}
+				</div>
+			{/if}
+		</section>
+
+		<section class="grid gap-6 lg:grid-cols-2">
+			<div class="flex flex-col gap-4">
+				<div class="flex items-center gap-2 bg-amber-200 rounded-3xl px-3 py-1 w-fit">
+					<StarIcon class="size-4 text-yellow-500" />
+					<h2 class="text-lg font-medium">Favoritos</h2>
+				</div>
+			<div class="flex flex-col gap-3">
+				{#each favoriteFiles as file (file.id)}
 					<FileCard {file} />
 				{/each}
 			</div>
-		{:else}
-			<div class="flex flex-col">
-				{#each filteredRecent as file (file.id)}
-					{@const Icon = fileIconFor(file.ext)}
-					<Item variant="muted" size="sm" class="rounded-3xl">
-						<div class="flex w-full items-center gap-3">
-							<div class="bg-muted flex size-9 items-center justify-center rounded-2xl">
-								<Icon class="text-muted-foreground size-4" />
-							</div>
-							<div class="min-w-0 flex-1">
-								<div class="truncate font-medium">{file.name}</div>
-								<div class="text-muted-foreground truncate text-xs">
-									{file.locationLabel}
-								</div>
-							</div>
-							<div class="text-muted-foreground hidden text-xs md:block">
-								{formatDate(file.updatedAt)}
-							</div>
-							<div class="text-muted-foreground w-[90px] text-end text-xs">
-								{formatBytes(file.sizeBytes)}
-							</div>
-						</div>
-					</Item>
-				{/each}
 			</div>
-		{/if}
-	</section>
 
-	<section class="grid gap-6 lg:grid-cols-2">
-		<div class="flex flex-col gap-3">
-			<div class="flex items-center gap-2">
-				<StarIcon class="text-muted-foreground size-4" />
-				<h2 class="text-lg font-semibold">Favoritos</h2>
+			<div class="flex flex-col gap-4">
+				<div class="flex items-center gap-2 bg-violet-200 rounded-3xl px-3 py-1 w-fit">
+					<SparklesIcon class="size-4 text-violet-500" />
+					<h2 class="text-lg font-medium">Sugeridos</h2>
+				</div>
+				<div class="flex flex-col gap-3">
+					{#each suggestedFiles as file (file.id)}
+						<FileCard {file} />
+					{/each}
+				</div>
 			</div>
-			<div class="flex gap-3 overflow-x-auto pb-2">
-				{#each FAVORITE_FILES as file (file.id)}
-					<div class="min-w-[260px]">
-						<FileCard {file} variant="compact" />
-					</div>
-				{/each}
-			</div>
-		</div>
-
-		<div class="flex flex-col gap-3">
-			<div class="flex items-center gap-2">
-				<SparklesIcon class="text-muted-foreground size-4" />
-				<h2 class="text-lg font-semibold">Sugeridos</h2>
-			</div>
-			<div class="flex flex-col gap-3">
-				{#each SUGGESTED_FILES.slice(0, 4) as file (file.id)}
-					<FileCard {file} variant="suggested" />
-				{/each}
-			</div>
-		</div>
-	</section>
+		</section>
+	{/if}
 </div>
-

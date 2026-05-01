@@ -19,44 +19,44 @@ var menuExtensions = []string{
 const menuLabel = "Agregar a Fileoteca"
 const shellKeyName = "Fileoteca"
 
-func installOneExt(k registry.Key, ext, exePath string) (bool, error) {
-	shellPath := fmt.Sprintf(`SystemFileAssociations\%s\shell\%s`, ext, shellKeyName)
+// regBase is the registry root for per-user context menu entries.
+// HKCU\Software\Classes merges into HKCR without requiring admin rights.
+const regBase = `Software\Classes`
+
+func installOneExt(ext, exePath string) error {
+	shellPath := fmt.Sprintf(`%s\SystemFileAssociations\%s\shell\%s`, regBase, ext, shellKeyName)
 	cmdPath := shellPath + `\command`
 
-	key, _, err := registry.CreateKey(k, shellPath, registry.SET_VALUE)
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, shellPath, registry.SET_VALUE)
 	if err != nil {
-		return false, fmt.Errorf("error creando clave para %s: %w", ext, err)
+		return fmt.Errorf("error creando clave para %s: %w", ext, err)
 	}
 	defer key.Close()
 
-	existing, _, err := key.GetStringValue("")
-	isNew := err != nil || existing != menuLabel
-
 	if err := key.SetStringValue("", menuLabel); err != nil {
-		return false, err
+		return err
 	}
 	if err := key.SetStringValue("Icon", exePath+",0"); err != nil {
-		return false, err
+		return err
 	}
 
-	cmdKey, _, err := registry.CreateKey(k, cmdPath, registry.SET_VALUE)
+	cmdKey, _, err := registry.CreateKey(registry.CURRENT_USER, cmdPath, registry.SET_VALUE)
 	if err != nil {
-		return false, fmt.Errorf("error creando comando para %s: %w", ext, err)
+		return fmt.Errorf("error creando comando para %s: %w", ext, err)
 	}
 	defer cmdKey.Close()
 
 	command := fmt.Sprintf(`"%s" --add "%%1"`, exePath)
 	if err := cmdKey.SetStringValue("", command); err != nil {
-		return false, err
+		return err
 	}
 
-	return isNew, nil
+	return nil
 }
 
 func IsRegistered() (bool, error) {
-	k, err := registry.OpenKey(registry.CLASSES_ROOT,
-		fmt.Sprintf(`SystemFileAssociations\%s\shell\%s`, menuExtensions[0], shellKeyName),
-		registry.QUERY_VALUE)
+	checkPath := fmt.Sprintf(`%s\SystemFileAssociations\%s\shell\%s`, regBase, menuExtensions[0], shellKeyName)
+	k, err := registry.OpenKey(registry.CURRENT_USER, checkPath, registry.QUERY_VALUE)
 	if err != nil {
 		if err == registry.ErrNotExist {
 			return false, nil
@@ -76,7 +76,7 @@ func Install() error {
 	var errs []string
 	installed := 0
 	for _, ext := range menuExtensions {
-		_, err := installOneExt(registry.CLASSES_ROOT, ext, exePath)
+		err := installOneExt(ext, exePath)
 		if err != nil {
 			errs = append(errs, err.Error())
 		} else {

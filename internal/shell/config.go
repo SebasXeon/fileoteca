@@ -10,6 +10,8 @@ import (
 type Config struct {
 	ContextMenuRegistered bool   `json:"context_menu_registered"`
 	InstalledPath         string `json:"installed_path"`
+	DefaultCategoryID     string `json:"default_category_id"`
+	DefaultSubcategoryID  string `json:"default_subcategory_id"`
 }
 
 func configDir() (string, error) {

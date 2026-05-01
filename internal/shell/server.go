@@ -11,6 +11,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 	"github.com/pocketbase/pocketbase/tools/osutils"
+	"github.com/pocketbase/pocketbase/tools/types"
 	"golang.org/x/sys/windows"
 )
 
@@ -84,6 +85,7 @@ func ensureDefaultCategory(app *pocketbase.PocketBase) error {
 		return fmt.Errorf("error buscando subcategoría por defecto: %w", err)
 	}
 
+	var subID string
 	if len(subRecords) == 0 {
 		rec := core.NewRecord(subcategories)
 		rec.Set("name", "General")
@@ -93,6 +95,16 @@ func ensureDefaultCategory(app *pocketbase.PocketBase) error {
 		if err := app.Save(rec); err != nil {
 			return fmt.Errorf("error creando subcategoría por defecto: %w", err)
 		}
+		subID = rec.Id
+	} else {
+		subID = subRecords[0].Id
+	}
+
+	cfg, _ := LoadConfig()
+	if cfg.DefaultCategoryID != catID || cfg.DefaultSubcategoryID != subID {
+		cfg.DefaultCategoryID = catID
+		cfg.DefaultSubcategoryID = subID
+		_ = SaveConfig(cfg)
 	}
 
 	return nil
@@ -116,15 +128,11 @@ func StartServer() (*pocketbase.PocketBase, func(), error) {
 		Automigrate: osutils.IsProbablyGoRun(),
 	})
 
+	ready := make(chan struct{})
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))
+		close(ready)
 		return se.Next()
-	})
-
-	bootstrapDone := make(chan struct{})
-	app.OnBootstrap().BindFunc(func(e *core.BootstrapEvent) error {
-		close(bootstrapDone)
-		return e.Next()
 	})
 
 	go func() {
@@ -133,10 +141,21 @@ func StartServer() (*pocketbase.PocketBase, func(), error) {
 		}
 	}()
 
-	<-bootstrapDone
+	<-ready
 
 	if err := ensureDefaultCategory(app); err != nil {
 		log.Printf("aviso: no se pudo crear categoría por defecto: %v", err)
+	}
+
+	// Ensure documents collection allows creation (migration sets it to read-only)
+	docs, err := app.FindCollectionByNameOrId("documents")
+	if err == nil && docs.CreateRule == nil {
+		docs.CreateRule = types.Pointer("")
+		if err := app.Save(docs); err != nil {
+			log.Printf("aviso: no se pudo actualizar reglas de documents: %v", err)
+		} else {
+			log.Println("reglas de creación actualizadas para documents")
+		}
 	}
 
 	stopFn := func() {

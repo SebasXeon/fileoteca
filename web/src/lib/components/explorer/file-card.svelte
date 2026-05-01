@@ -7,7 +7,7 @@
 		formatBytes,
 		formatDate,
 		type ExplorerFile,
-	} from "$lib/mock/explorer";
+	} from "$lib/types";
 	import type { HTMLAttributes } from "svelte/elements";
 
 	type Variant = "default" | "compact" | "suggested";
@@ -33,7 +33,7 @@
 				<div class="bg-muted mt-6 flex size-10 items-center justify-center rounded-2xl">
 					<Icon class="text-muted-foreground size-5" />
 				</div>
-				<div class="min-w-0flex-1 py-6">
+				<div class="min-w-0 flex-1 py-6">
 					<div class="flex items-start justify-between gap-2">
 						<div class="min-w-0">
 							<div class="truncate font-medium">{file.name}</div>
@@ -51,11 +51,11 @@
 		</Card.Content>
 	{:else}
 		<Card.Header>
-			<div class="flex gap-3">
+			<div class="flex gap-3 min-w-0">
 				<div class="bg-muted flex size-10 items-center justify-center rounded-2xl" aria-hidden="true">
 					<Icon class="text-muted-foreground size-5" />
 				</div>
-				<div>
+				<div class="min-w-0 flex-1">
 					<Card.Title class="truncate">{file.name}</Card.Title>
 					<Card.Description class="truncate">{file.locationLabel}</Card.Description>
 				</div>

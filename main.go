@@ -24,15 +24,16 @@ func main() {
 	if addFilePath != "" {
 		info, err := addfile.Extract(addFilePath)
 		if err != nil {
-			log.Printf("error: %v\n", err)
+			shell.ShowError(fmt.Sprintf("Error: %v", err))
 			os.Exit(1)
 		}
 
 		if shell.IsServerRunning() {
 			if err := shell.AddFileViaHTTP(info); err != nil {
-				log.Printf("error agregando documento: %v\n", err)
+				shell.ShowError(fmt.Sprintf("Error agregando documento:\n%v", err))
 				os.Exit(1)
 			}
+			shell.ShowInfo(fmt.Sprintf("\"%s\" agregado a Fileoteca.", info.FileName))
 			return
 		}
 

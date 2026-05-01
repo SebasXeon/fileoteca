@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from "svelte";
 	import SearchIcon from "@lucide/svelte/icons/search";
 	import FolderPlusIcon from "@lucide/svelte/icons/folder-plus";
 	import UploadIcon from "@lucide/svelte/icons/upload";
@@ -15,27 +16,36 @@
 	import { Item } from "$lib/components/ui/item/index.js";
 	import { Separator } from "$lib/components/ui/separator/index.js";
 
-	import {
-		FOLDERS,
-		FolderIcon,
-		formatDate,
-		type ExplorerFolder,
-	} from "$lib/mock/explorer";
+	import { FolderIcon, formatDate, type ExplorerFolder } from "$lib/types";
+	import { getFolders } from "$lib/api";
 
 	type ViewMode = "grid" | "list";
 
 	let view: ViewMode = $state("grid");
 	let query = $state("");
-	let selectedFolderId: string | null = $state(FOLDERS[0]?.id ?? null);
+	let folders = $state<ExplorerFolder[]>([]);
+	let loading = $state(true);
+
+	onMount(async () => {
+		try {
+			folders = await getFolders();
+		} catch (err) {
+			console.error("Failed to load folders:", err);
+		} finally {
+			loading = false;
+		}
+	});
+
+	let selectedFolderId = $state<string | null>(null);
 
 	const visibleFolders = $derived.by(() => {
 		const q = query.trim().toLowerCase();
-		return FOLDERS.filter((f) => !q || f.name.toLowerCase().includes(q));
+		return folders.filter((f) => !q || f.name.toLowerCase().includes(q));
 	});
 
 	const selectedFolder: ExplorerFolder | null = $derived.by(() => {
 		if (!selectedFolderId) return null;
-		return FOLDERS.find((f) => f.id === selectedFolderId) ?? null;
+		return folders.find((f) => f.id === selectedFolderId) ?? null;
 	});
 </script>
 
@@ -44,7 +54,7 @@
 		<div class="min-w-0">
 			<h1 class="text-2xl font-semibold leading-tight">Carpetas</h1>
 			<p class="text-muted-foreground">
-				Agrupa y navega como explorer (estilo Drive). Después conectamos la lógica.
+				Agrupa y navega como explorer (estilo Drive).
 			</p>
 		</div>
 		<div class="flex flex-wrap items-center gap-2">
@@ -59,7 +69,9 @@
 		</div>
 	</div>
 
-	{#if FOLDERS.length === 0}
+	{#if loading}
+		<div class="text-muted-foreground py-10 text-center">Cargando…</div>
+	{:else if folders.length === 0}
 		<Empty>
 			<div class="text-muted-foreground">
 				Aún no tienes carpetas. Crea una para agrupar documentos.
@@ -215,4 +227,3 @@
 		</div>
 	{/if}
 </div>
-

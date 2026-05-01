@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"syscall"
+	"unsafe"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -13,33 +15,52 @@ import (
 	"SebasXeon/Fileoteca/internal/addfile"
 )
 
+func msgBox(msg string) {
+	caption, _ := syscall.UTF16PtrFromString("Fileoteca")
+	text, _ := syscall.UTF16PtrFromString(msg)
+	syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW").Call(
+		0, uintptr(unsafe.Pointer(text)), uintptr(unsafe.Pointer(caption)), 0x10,
+	)
+}
+
+func ShowError(msg string) {
+	msgBox(msg)
+}
+
+func ShowInfo(msg string) {
+	caption, _ := syscall.UTF16PtrFromString("Fileoteca")
+	text, _ := syscall.UTF16PtrFromString(msg)
+	syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW").Call(
+		0, uintptr(unsafe.Pointer(text)), uintptr(unsafe.Pointer(caption)), 0x40,
+	)
+}
+
 func AddFileViaHTTP(info *addfile.Info) error {
-	body := map[string]any{
-		"name":        info.Name,
-		"file_name":   info.FileName,
-		"file_ext":    info.FileExt,
-		"file_size":   info.FileSize,
-		"path":        info.Path,
-		"last_access": info.LastAccess,
-		"status":      "pending",
-		"source_type": "context_menu",
-		"is_favorite": false,
+	cfg, err := LoadConfig()
+	if err != nil {
+		return fmt.Errorf("no se pudo leer config: %w", err)
+	}
+	if cfg.DefaultCategoryID == "" || cfg.DefaultSubcategoryID == "" {
+		return fmt.Errorf("IDs de categoría por defecto no configurados — inicia la app normalmente primero")
 	}
 
-	catID, err := resolveCategoryID()
-	if err != nil {
-		return fmt.Errorf("no se pudo resolver categoría por defecto: %w", err)
+	body := map[string]any{
+		"name":           info.Name,
+		"file_name":      info.FileName,
+		"file_ext":       info.FileExt,
+		"file_size":      info.FileSize,
+		"path":           info.Path,
+		"last_access":    info.LastAccess,
+		"status":         "pending",
+		"source_type":    "context_menu",
+		"is_favorite":    false,
+		"category_id":    cfg.DefaultCategoryID,
+		"subcategory_id": cfg.DefaultSubcategoryID,
 	}
-	subID, err := resolveSubcategoryID(catID)
-	if err != nil {
-		return fmt.Errorf("no se pudo resolver subcategoría por defecto: %w", err)
-	}
-	body["category_id"] = catID
-	body["subcategory_id"] = subID
 
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
-		return fmt.Errorf("error serializando datos: %w", err)
+		return fmt.Errorf("error serializando: %w", err)
 	}
 
 	resp, err := http.Post(
@@ -53,59 +74,16 @@ func AddFileViaHTTP(info *addfile.Info) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("servidor respondió con error %d", resp.StatusCode)
+		var errBody struct {
+			Message string `json:"message"`
+			Data    any    `json:"data"`
+		}
+		json.NewDecoder(resp.Body).Decode(&errBody)
+		return fmt.Errorf("servidor respondió %d: %s — %v", resp.StatusCode, errBody.Message, errBody.Data)
 	}
 
 	log.Printf("documento agregado: %s (%s)", info.FileName, info.Path)
 	return nil
-}
-
-func resolveCategoryID() (string, error) {
-	resp, err := http.Get(
-		"http://127.0.0.1:8090/api/collections/categories/records?filter=(name='Sin categorizar')&fields=id&perPage=1",
-	)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var result struct {
-		Items []struct {
-			ID string `json:"id"`
-		} `json:"items"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
-	}
-	if len(result.Items) == 0 {
-		return "", fmt.Errorf("categoría 'Sin categorizar' no encontrada")
-	}
-	return result.Items[0].ID, nil
-}
-
-func resolveSubcategoryID(catID string) (string, error) {
-	url := fmt.Sprintf(
-		"http://127.0.0.1:8090/api/collections/subcategories/records?filter=(name='General'&&category_id='%s')&fields=id&perPage=1",
-		catID,
-	)
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var result struct {
-		Items []struct {
-			ID string `json:"id"`
-		} `json:"items"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
-	}
-	if len(result.Items) == 0 {
-		return "", fmt.Errorf("subcategoría 'General' no encontrada para categoría %s", catID)
-	}
-	return result.Items[0].ID, nil
 }
 
 func AddFileViaDAO(app *pocketbase.PocketBase, info *addfile.Info) error {
