@@ -24,7 +24,7 @@ func StartOcrServer(ocrServerDir string) (*OcrServer, error) {
 		return nil, fmt.Errorf("invalid ocr server path: %w", err)
 	}
 
-	cmd := exec.Command("uv", "run", "--directory", fullPath, "ocr-server")
+	cmd := exec.Command("uv", "run", "--directory", fullPath, "python", "-m", "ocr_server.main", "server")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
