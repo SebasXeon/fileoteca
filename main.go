@@ -16,6 +16,26 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+func resolveOcrServerDir() string {
+	// Try relative to working directory first (for dev: `go run .`)
+	cwd, _ := os.Getwd()
+	cwdCandidate := filepath.Join(cwd, "ocr-server")
+	if info, err := os.Stat(cwdCandidate); err == nil && info.IsDir() {
+		return cwdCandidate
+	}
+
+	// Try relative to executable (for production: Fileoteca.exe next to ocr-server/)
+	exec, err := os.Executable()
+	if err == nil {
+		exeCandidate := filepath.Join(filepath.Dir(exec), "ocr-server")
+		if info, err := os.Stat(exeCandidate); err == nil && info.IsDir() {
+			return exeCandidate
+		}
+	}
+
+	return "ocr-server"
+}
+
 func main() {
 	var addFilePath string
 
@@ -71,14 +91,7 @@ func main() {
 	}
 
 	// Start OCR server
-	execPath, err := os.Executable()
-	var ocrServerDir string
-	if err == nil {
-		execDir := filepath.Dir(execPath)
-		ocrServerDir = filepath.Join(execDir, "ocr-server")
-	} else {
-		ocrServerDir = "ocr-server"
-	}
+	ocrServerDir := resolveOcrServerDir()
 	ocrServer, ocrErr := ocr.StartOcrServer(ocrServerDir)
 	if ocrErr != nil {
 		log.Printf("aviso: OCR server no disponible: %v", ocrErr)
