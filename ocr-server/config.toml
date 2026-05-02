@@ -1,0 +1,3 @@
+engine = "winocr"
+host = "[::1]"
+port = 50051

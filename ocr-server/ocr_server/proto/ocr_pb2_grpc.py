@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import ocr_pb2 as ocr__pb2
+from ocr_server.proto import ocr_pb2 as ocr__pb2
 
 GRPC_GENERATED_VERSION = '1.80.0'
 GRPC_VERSION = grpc.__version__
