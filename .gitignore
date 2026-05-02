@@ -1,0 +1,6 @@
+ocr-server/.venv/
+ocr-server/__pycache__/
+ocr-server/ocr_server/**/__pycache__/
+ocr-server/*.egg-info/
+pb_data/
+Fileoteca.exe
