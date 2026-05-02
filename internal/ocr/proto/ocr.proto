@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package ocr;
+
+option go_package = "SebasXeon/Fileoteca/internal/ocr/proto";
+
+service OCREngine {
+    rpc ExtractText(ExtractRequest) returns (ExtractResponse);
+}
+
+message ExtractRequest {
+    string id = 1;
+    string file_path = 2;
+    string file_type = 3;
+}
+
+message ExtractResponse {
+    string text = 1;
+}
