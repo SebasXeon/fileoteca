@@ -18,3 +18,11 @@ dependencies = [
     "markitdown>=0.0.1",
     "tomli>=2.0.0",
 ]
+
+[project.scripts]
+ocr-server = "ocr_server.main:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
