@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"time"
 
 	"SebasXeon/Fileoteca/internal/addfile"
+	"SebasXeon/Fileoteca/internal/ocr"
 	"SebasXeon/Fileoteca/internal/shell"
 
 	_ "SebasXeon/Fileoteca/migrations"
+
+	"github.com/pocketbase/pocketbase/core"
 )
 
 func main() {
@@ -60,9 +65,57 @@ func main() {
 		return
 	}
 
-	_, stopFn, err := shell.StartServer()
+	app, stopFn, err := shell.StartServer()
 	if err != nil {
 		log.Fatalf("error iniciando servidor: %v\n", err)
+	}
+
+	// Start OCR server
+	execPath, err := os.Executable()
+	var ocrServerDir string
+	if err == nil {
+		execDir := filepath.Dir(execPath)
+		ocrServerDir = filepath.Join(execDir, "ocr-server")
+	} else {
+		ocrServerDir = "ocr-server"
+	}
+	ocrServer, ocrErr := ocr.StartOcrServer(ocrServerDir)
+	if ocrErr != nil {
+		log.Printf("aviso: OCR server no disponible: %v", ocrErr)
+	} else {
+		defer ocrServer.Stop()
+
+		ocrClient, clientErr := ocr.NewOcrClient(ocr.OcrServerAddr())
+		if clientErr != nil {
+			log.Printf("aviso: cliente OCR no disponible: %v", clientErr)
+		} else {
+			defer ocrClient.Close()
+			ocrWorker := ocr.NewOcrWorker(ocrClient, app, 100)
+			ocrWorker.Start()
+			defer ocrWorker.Stop()
+
+			app.OnRecordCreate("documents").BindFunc(func(e *core.RecordEvent) error {
+				go func() {
+					resolvedPath, cleanup, err := ocr.ResolvePath(e.Record)
+					if err != nil {
+						log.Printf("OCR skip para %s: %v", e.Record.Id, err)
+						return
+					}
+					ocrWorker.Enqueue(ocr.OcrJob{
+						ID:       e.Record.Id,
+						FilePath: resolvedPath,
+						FileType: e.Record.GetString("file_ext"),
+					})
+					go func() {
+						time.Sleep(5 * time.Minute)
+						cleanup()
+					}()
+				}()
+				return e.Next()
+			})
+
+			log.Println("OCR integrado correctamente")
+		}
 	}
 
 	fmt.Println("Fileoteca iniciada. Haz clic en el icono del área de notificación.")
