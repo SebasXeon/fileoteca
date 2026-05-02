@@ -1,0 +1,20 @@
+[project]
+name = "ocr-server"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "pillow>=12.2.0",
+    "pypdfium2>=5.7.1",
+    "winrt-runtime>=3.2.1",
+    "winrt-windows-globalization>=3.2.1",
+    "winrt-windows-graphics-imaging>=3.2.1",
+    "winrt-windows-media-ocr>=3.2.1",
+    "winrt-windows-storage>=3.2.1",
+    "winrt-windows-storage-streams>=3.2.1",
+    "grpcio>=1.71.0",
+    "grpcio-tools>=1.71.0",
+    "markitdown>=0.0.1",
+    "tomli>=2.0.0",
+]
