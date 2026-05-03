@@ -102,7 +102,7 @@ func (m *ClassifierManager) ClassifyAndAssign(docID string, ocrText string) {
 
 	subcategoryID := string(c.Classes[bestIdx])
 
-	if subcategoryID == "_other" {
+	if subcategoryID == defaultOtherClass {
 		log.Printf("classifier: classified as _other for %s, skipping", docID)
 		return
 	}
@@ -160,7 +160,7 @@ func (m *ClassifierManager) Retrain(subcategoryID string) error {
 	c := m.classifier
 
 	if c == nil {
-		c = bayesian.NewClassifier(bayesian.Class(subcategoryID), bayesian.Class("_other"))
+		c = bayesian.NewClassifier(bayesian.Class(subcategoryID), bayesian.Class(defaultOtherClass))
 		c.Learn(words, bayesian.Class(subcategoryID))
 	} else {
 		found := false
@@ -171,13 +171,15 @@ func (m *ClassifierManager) Retrain(subcategoryID string) error {
 			}
 		}
 
-		if !found {
-			trainingData := make(map[string][]string)
-			for _, cls := range c.Classes {
-				clsName := string(cls)
-				if clsName == "_other" {
-					continue
-				}
+		trainingData := make(map[string][]string)
+		for _, cls := range c.Classes {
+			clsName := string(cls)
+			if clsName == defaultOtherClass {
+				continue
+			}
+			if clsName == subcategoryID {
+				trainingData[clsName] = ocrTexts
+			} else {
 				wm := c.WordsByClass(cls)
 				existingWords := make([]string, 0, len(wm))
 				for w := range wm {
@@ -185,30 +187,16 @@ func (m *ClassifierManager) Retrain(subcategoryID string) error {
 				}
 				trainingData[clsName] = []string{strings.Join(existingWords, " ")}
 			}
-			trainingData[subcategoryID] = ocrTexts
-
-			c = rebuildClassifierFromData(trainingData, 1000)
-		} else {
-			trainingData := make(map[string][]string)
-			for _, cls := range c.Classes {
-				clsName := string(cls)
-				if clsName == "_other" {
-					continue
-				}
-				if clsName == subcategoryID {
-					trainingData[clsName] = ocrTexts
-				} else {
-					wm := c.WordsByClass(cls)
-					existingWords := make([]string, 0, len(wm))
-					for w := range wm {
-						existingWords = append(existingWords, w)
-					}
-					trainingData[clsName] = []string{strings.Join(existingWords, " ")}
-				}
-			}
-
-			c = rebuildClassifierFromData(trainingData, 1000)
 		}
+		if !found {
+			trainingData[subcategoryID] = ocrTexts
+		}
+
+		newC := rebuildClassifierFromData(trainingData, 1000)
+		if newC == nil {
+			return fmt.Errorf("rebuild classifier returned nil for %s", subcategoryID)
+		}
+		c = newC
 	}
 
 	m.classifier = c
@@ -231,7 +219,7 @@ func rebuildClassifierFromData(trainingData map[string][]string, topN int) *baye
 	for subcatID := range trainingData {
 		classNames = append(classNames, bayesian.Class(subcatID))
 	}
-	classNames = append(classNames, bayesian.Class("_other"))
+	classNames = append(classNames, bayesian.Class(defaultOtherClass))
 
 	c := bayesian.NewClassifier(classNames...)
 
