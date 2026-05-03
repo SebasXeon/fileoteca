@@ -85,13 +85,8 @@ func (m *ClassifierManager) ClassifyAndAssign(docID string, ocrText string) {
 		}
 	}
 
-	if bestScore < -5.0 {
-		log.Printf("classifier: low confidence %.2f for %s, skipping", bestScore, docID)
-		return
-	}
-
 	if len(scores) > 1 && (bestScore-secondBest) < 1.0 {
-		log.Printf("classifier: uncertain (diff=%.2f) for %s, skipping", bestScore-secondBest, docID)
+		log.Printf("classifier: uncertain classification (diff=%.2f) for %s, skipping", bestScore-secondBest, docID)
 		return
 	}
 
