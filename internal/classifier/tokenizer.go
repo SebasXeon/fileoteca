@@ -17,9 +17,9 @@ var spanishStopwords = map[string]bool{
 	"le": true, "ya": true, "o": true, "este": true, "fue": true,
 	"ha": true, "era": true, "muy": true, "son": true, "todo": true,
 	"si": true, "sin": true, "sobre": true, "entre": true, "cuando": true,
-	"tambien": true, "asi": true, "dos": true, "hasta": true, "desde": true,
+	"también": true, "así": true, "dos": true, "hasta": true, "desde": true,
 	"porque": true, "cada": true, "otros": true, "gran": true, "vez": true,
-	"ano": true, "parte": true, "me": true, "mi": true,
+	"año": true, "parte": true, "me": true, "mi": true,
 	"tu": true, "te": true, "nos": true, "os": true, "les": true,
 	"e": true, "ni": true, "tras": true, "hacia": true,
 	"durante": true, "contra": true, "bajo": true,
@@ -50,6 +50,9 @@ type wordCount struct {
 }
 
 func TopWords(docs []string, n int) []string {
+	if n <= 0 {
+		return nil
+	}
 	freq := make(map[string]int)
 	for _, doc := range docs {
 		tokens := Tokenize(doc)
@@ -86,6 +89,9 @@ func TopWords(docs []string, n int) []string {
 }
 
 func isNumeric(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
 	for _, r := range s {
 		if r < '0' || r > '9' {
 			return false

@@ -2,15 +2,12 @@ package classifier
 
 import (
 	"reflect"
-	"sort"
 	"testing"
 )
 
 func TestTokenize(t *testing.T) {
 	tokens := Tokenize("Hola Mundo! Esto es una prueba de tokenización 123.")
-	sort.Strings(tokens)
 	expected := []string{"hola", "mundo", "esto", "prueba", "tokenización"}
-	sort.Strings(expected)
 	if !reflect.DeepEqual(tokens, expected) {
 		t.Errorf("Tokenize = %v, want %v", tokens, expected)
 	}
@@ -38,8 +35,6 @@ func TestTopWords(t *testing.T) {
 	}
 	top := TopWords(docs, 3)
 	expected := []string{"gato", "perro", "pez"}
-	sort.Strings(top)
-	sort.Strings(expected)
 	if !reflect.DeepEqual(top, expected) {
 		t.Errorf("TopWords = %v, want %v", top, expected)
 	}
@@ -51,12 +46,9 @@ func TestTopWordsWithStopwords(t *testing.T) {
 		"la casa del perro que ladra",
 	}
 	top := TopWords(docs, 3)
-	sort.Strings(top)
-	if len(top) != 3 {
-		t.Fatalf("expected 3 top words, got %d: %v", len(top), top)
-	}
-	if top[0] != "casa" {
-		t.Errorf("expected 'casa' as top word (freq 2), got %s", top[0])
+	expected := []string{"casa", "gato", "ladra"}
+	if !reflect.DeepEqual(top, expected) {
+		t.Errorf("TopWords = %v, want %v", top, expected)
 	}
 }
 
@@ -64,5 +56,21 @@ func TestTopWordsEmptyDocs(t *testing.T) {
 	top := TopWords([]string{}, 10)
 	if len(top) != 0 {
 		t.Errorf("expected empty result, got %v", top)
+	}
+}
+
+func TestTopWordsNTooLarge(t *testing.T) {
+	docs := []string{"gato perro gato"}
+	top := TopWords(docs, 10)
+	expected := []string{"gato", "perro"}
+	if !reflect.DeepEqual(top, expected) {
+		t.Errorf("TopWords = %v, want %v", top, expected)
+	}
+}
+
+func TestTopWordsNegativeN(t *testing.T) {
+	top := TopWords([]string{"gato perro"}, -1)
+	if top != nil {
+		t.Errorf("expected nil for negative n, got %v", top)
 	}
 }
