@@ -60,12 +60,7 @@ func (m *ClassifierManager) ClassifyAndAssign(docID string, ocrText string) {
 		return
 	}
 
-	scores, inx, strict := c.LogScores(tokens)
-
-	if strict {
-		log.Printf("classifier: strict mode for %s, skipping", docID)
-		return
-	}
+	scores, inx, _ := c.LogScores(tokens)
 
 	if inx < 0 || inx >= len(scores) {
 		return
@@ -162,6 +157,7 @@ func (m *ClassifierManager) Retrain(subcategoryID string) error {
 	if c == nil {
 		c = bayesian.NewClassifier(bayesian.Class(subcategoryID), bayesian.Class(defaultOtherClass))
 		c.Learn(words, bayesian.Class(subcategoryID))
+		c.Learn(Tokenize(spanishBaselineText), bayesian.Class(defaultOtherClass))
 	} else {
 		found := false
 		for _, cls := range c.Classes {
@@ -219,7 +215,7 @@ func rebuildClassifierFromData(trainingData map[string][]string, topN int) *baye
 	for subcatID := range trainingData {
 		classNames = append(classNames, bayesian.Class(subcatID))
 	}
-	classNames = append(classNames, bayesian.Class(defaultOtherClass))
+	classNames = append(classNames, bayesian.Class("_other"))
 
 	c := bayesian.NewClassifier(classNames...)
 
@@ -230,5 +226,19 @@ func rebuildClassifierFromData(trainingData map[string][]string, topN int) *baye
 		}
 	}
 
+	c.Learn(Tokenize(spanishBaselineText), bayesian.Class("_other"))
+
 	return c
 }
+
+var spanishBaselineText = `
+	documento pagina archivo fecha numero nombre direccion telefono email
+	informacion datos contenido texto seccion capitulo indice titulo
+	tabla figura imagen grafico lista item elemento valor unidad
+	codigo referencia anexo adjunto copia original version revision
+	proyecto informe reporte resumen analisis estudio caso ejemplo
+	desarrollo implementacion proceso procedimiento funcion metodo
+	sistema aplicacion programa software hardware dispositivo equipo
+	servicio producto cliente usuario persona empresa organizacion
+	general especifico particular comun basico avanzado principal
+`
