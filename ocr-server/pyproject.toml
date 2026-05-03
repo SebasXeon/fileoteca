@@ -17,6 +17,7 @@ dependencies = [
     "grpcio-tools>=1.71.0",
     "markitdown>=0.0.1",
     "tomli>=2.0.0",
+    "winrt-windows-foundation>=3.2.1",
 ]
 
 [project.scripts]

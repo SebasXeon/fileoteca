@@ -3,8 +3,12 @@ package shell
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"strings"
 	"syscall"
+
+	"SebasXeon/Fileoteca/internal/api"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -130,7 +134,20 @@ func StartServer() (*pocketbase.PocketBase, func(), error) {
 
 	ready := make(chan struct{})
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))
+		se.Router.GET("/api/documents/open/{id}", api.OpenDocumentHandler(app))
+
+		staticHandler := apis.Static(os.DirFS("./pb_public"), false)
+		se.Router.GET("/{path...}", func(e *core.RequestEvent) error {
+			if strings.HasPrefix(e.Request.URL.Path, "/api/") {
+				return e.Next()
+			}
+			if err := staticHandler(e); err != nil {
+				http.ServeFile(e.Response, e.Request, "./pb_public/index.html")
+				return nil
+			}
+			return nil
+		})
+
 		close(ready)
 		return se.Next()
 	})

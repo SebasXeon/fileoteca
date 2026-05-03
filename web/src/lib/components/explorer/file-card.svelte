@@ -1,5 +1,6 @@
 <script lang="ts">
 	import StarIcon from "@lucide/svelte/icons/star";
+	import StarOffIcon from "@lucide/svelte/icons/star-off";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
 	import {
@@ -9,24 +10,50 @@
 		type ExplorerFile,
 	} from "$lib/types";
 	import type { HTMLAttributes } from "svelte/elements";
+	import DocumentContextMenu from "./document-context-menu.svelte";
+	import { toggleFavorite } from "$lib/api";
+	import { toast } from "svelte-sonner";
 
 	type Variant = "default" | "compact" | "suggested";
 
 	let {
 		file,
 		variant = "default",
+		href,
 		class: className,
+		onchange,
+		onFavoriteToggle,
 		...restProps
 	}: {
 		file: ExplorerFile;
 		variant?: Variant;
+		href?: string;
 		class?: string;
+		onchange?: () => void;
+		onFavoriteToggle?: (isFavorite: boolean) => void;
 	} & HTMLAttributes<HTMLDivElement> = $props();
 
 	const Icon = $derived.by(() => fileIconFor(file.ext));
+	const visualizable = $derived(["pdf", "png", "jpg", "jpeg", "gif", "bmp", "svg", "webp", "tiff", "ico", "txt", "csv", "md", "json", "xml", "html", "htm", "rtf"].includes(file.ext));
+
+	async function handleToggleFavorite() {
+		try {
+			const newVal = await toggleFavorite(file.id, file.favorite ?? false);
+			file = { ...file, favorite: newVal };
+			toast.success(newVal ? "Agregado a favoritos" : "Eliminado de favoritos");
+			if (onFavoriteToggle) {
+				onFavoriteToggle(newVal);
+			} else {
+				onchange?.();
+			}
+		} catch (err) {
+			toast.error(`Error: ${err}`);
+		}
+	}
 </script>
 
-<Card.Root class={["shadow-sm", className].filter(Boolean).join(" ")} {...restProps}>
+{#snippet cardContent()}
+	<Card.Root class={["shadow-sm", "relative", className].filter(Boolean).join(" ")} {...restProps}>
 	{#if variant === "suggested"}
 		<Card.Content class="pt-0">
 			<div class="flex gap-3">
@@ -76,13 +103,37 @@
 				</div>
 			{/if}
 		</Card.Content>
-		{#if file.favorite && variant === "default"}
-			<Card.Footer>
-				<span class="text-muted-foreground inline-flex items-center gap-1 text-xs">
-					<StarIcon class="size-3" />
-					Favorito
-				</span>
-			</Card.Footer>
-		{/if}
 	{/if}
+
+	<button
+		onclick={(e) => { e.stopPropagation(); e.preventDefault(); handleToggleFavorite(); }}
+		class="absolute bottom-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200 flex items-center justify-center size-7 rounded-full bg-background/80 backdrop-blur-sm shadow-sm ring-1 ring-foreground/10 hover:bg-background"
+		aria-label={file.favorite ? "Quitar de favoritos" : "Agregar a favoritos"}
+	>
+		{#if file.favorite}
+			<StarIcon class="size-4 fill-amber-400 text-amber-400" />
+		{:else}
+			<StarOffIcon class="size-4 text-muted-foreground" />
+		{/if}
+	</button>
 </Card.Root>
+{/snippet}
+
+<DocumentContextMenu
+	docId={file.id}
+	docName={file.name}
+	isFavorite={file.favorite ?? false}
+	isVisualizable={visualizable}
+	onchange={() => onchange?.()}
+	onFavoriteToggle={(val) => onFavoriteToggle?.(val)}
+>
+	{#snippet children()}
+		{#if href}
+			<a href={href} class="block no-underline text-inherit">
+				{@render cardContent()}
+			</a>
+		{:else}
+			{@render cardContent()}
+		{/if}
+	{/snippet}
+</DocumentContextMenu>

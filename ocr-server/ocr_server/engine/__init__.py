@@ -1,4 +1,6 @@
-from .registry import create_engine
+from .registry import create_engine, available_engines
 from .base import OCREngine
 
-__all__ = ["OCREngine", "create_engine"]
+from . import winocr  # registers @register("winocr")
+
+__all__ = ["OCREngine", "create_engine", "available_engines"]

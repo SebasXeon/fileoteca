@@ -1,0 +1,1 @@
+import{a as e,o as t}from"./C6pChRQf.js";import"./v_jBEYI6.js";import{k as n}from"./DBc9tf-y.js";function r(r,i){let a=e(i,[`$$slots`,`$$events`,`$$legacy`]),o=[[`path`,{d:`M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z`}]];n(r,t({name:`folder`},()=>a,{get iconNode(){return o}}))}export{r as t};

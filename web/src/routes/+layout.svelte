@@ -7,6 +7,7 @@
 	import { page } from "$app/stores";
 	import { titleForPath } from "$lib/app-nav";
 	import { onMount } from "svelte";
+	import { Toaster } from "svelte-sonner";
 	import { SIDEBAR_COOKIE_NAME } from "$lib/components/ui/sidebar/constants.js";
 
 	let { children } = $props();
@@ -50,4 +51,5 @@
       {@render children()}
     </div>
   </Sidebar.Inset>
+  <Toaster />
 </Sidebar.Provider>

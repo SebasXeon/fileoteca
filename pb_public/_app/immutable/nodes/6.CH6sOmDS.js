@@ -1,0 +1,1 @@
+import{A as e,O as t,vt as n}from"../chunks/C6pChRQf.js";import"../chunks/v_jBEYI6.js";var r=e(`<h1 class="text-2xl font-semibold">Buscar</h1> <p class="text-muted-foreground">Búsqueda por nombre, OCR y filtros.</p>`,1);function i(e){var i=r();n(2),t(e,i)}export{i as component};

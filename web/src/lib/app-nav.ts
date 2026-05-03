@@ -30,6 +30,7 @@ export function isActivePath(currentPathname: string, href: string): boolean {
 
 export function titleForPath(pathname: string): string {
 	const normalized = normalizePath(pathname);
+	if (normalized.startsWith("/document/")) return "Documento";
 	const match = APP_NAV.find((i) => normalizePath(i.href) === normalized);
 	if (match) return match.title;
 	if (normalized === "/") return "Inicio";

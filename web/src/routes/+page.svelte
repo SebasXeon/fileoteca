@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from "svelte";
+	import { goto } from "$app/navigation";
 	import SearchIcon from "@lucide/svelte/icons/search";
 	import StarIcon from "@lucide/svelte/icons/star";
 	import SparklesIcon from "@lucide/svelte/icons/sparkles";
@@ -29,6 +30,7 @@
 		getRecentDocuments,
 		getFavoriteDocuments,
 	} from "$lib/api";
+	import DocumentContextMenu from "$lib/components/explorer/document-context-menu.svelte";
 
 	type ViewMode = "grid" | "list";
 	type SortMode = "recent" | "name" | "size";
@@ -46,6 +48,12 @@
 	let error = $state("");
 
 	onMount(async () => {
+		await loadData();
+	});
+
+	async function loadData() {
+		loading = true;
+		error = "";
 		try {
 			const [recent, favorites] = await Promise.all([
 				getRecentDocuments(),
@@ -59,7 +67,28 @@
 		} finally {
 			loading = false;
 		}
-	});
+	}
+
+	function handleFavoriteToggle(id: string, isFavorite: boolean) {
+		const recentIdx = recentFiles.findIndex((f) => f.id === id);
+		if (recentIdx !== -1) {
+			recentFiles[recentIdx] = { ...recentFiles[recentIdx], favorite: isFavorite };
+		}
+
+		if (isFavorite) {
+			const alreadyInFavs = favoriteFiles.find((f) => f.id === id);
+			if (!alreadyInFavs && recentIdx !== -1) {
+				favoriteFiles = [...favoriteFiles, recentFiles[recentIdx]];
+			}
+		} else {
+			favoriteFiles = favoriteFiles.filter((f) => f.id !== id);
+		}
+
+		const suggestedIdx = suggestedFiles.findIndex((f) => f.id === id);
+		if (suggestedIdx !== -1) {
+			suggestedFiles[suggestedIdx] = { ...suggestedFiles[suggestedIdx], favorite: isFavorite };
+		}
+	}
 
 	function matchesType(file: ExplorerFile) {
 		if (typeFilter === "all") return true;
@@ -209,32 +238,43 @@
 			{#if view === "grid"}
 				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 					{#each filteredRecent as file (file.id)}
-						<FileCard {file} />
+						<FileCard {file} href={`/document/${file.id}`} onchange={loadData} onFavoriteToggle={(val) => handleFavoriteToggle(file.id, val)} />
 					{/each}
 				</div>
 			{:else}
 				<div class="flex flex-col">
 					{#each filteredRecent as file (file.id)}
 						{@const Icon = fileIconFor(file.ext)}
-						<Item variant="muted" size="sm" class="rounded-3xl">
-							<div class="flex w-full items-center gap-3">
-								<div class="bg-muted flex size-9 items-center justify-center rounded-2xl">
-									<Icon class="text-muted-foreground size-4" />
-								</div>
-								<div class="min-w-0 flex-1">
-									<div class="truncate font-medium">{file.name}</div>
-									<div class="text-muted-foreground truncate text-xs">
-										{file.locationLabel}
+						<DocumentContextMenu
+							docId={file.id}
+							docName={file.name}
+							isFavorite={file.favorite ?? false}
+							isVisualizable={!["docx", "xlsx", "doc", "xls", "ppt", "pptx", "odt", "ods", "odp", "zip"].includes(file.ext)}
+							onchange={loadData}
+							onFavoriteToggle={(val) => handleFavoriteToggle(file.id, val)}
+						>
+							{#snippet children()}
+								<Item variant="muted" size="sm" class="rounded-3xl cursor-pointer hover:bg-muted/80" onclick={() => goto(`/document/${file.id}`)}>
+									<div class="flex w-full items-center gap-3">
+										<div class="bg-muted flex size-9 items-center justify-center rounded-2xl">
+											<Icon class="text-muted-foreground size-4" />
+										</div>
+										<div class="min-w-0 flex-1">
+											<div class="truncate font-medium">{file.name}</div>
+											<div class="text-muted-foreground truncate text-xs">
+												{file.locationLabel}
+											</div>
+										</div>
+										<div class="text-muted-foreground hidden text-xs md:block">
+											{formatDate(file.updatedAt)}
+										</div>
+										<div class="text-muted-foreground w-[90px] text-end text-xs">
+											{formatBytes(file.sizeBytes)}
+										</div>
 									</div>
-								</div>
-								<div class="text-muted-foreground hidden text-xs md:block">
-									{formatDate(file.updatedAt)}
-								</div>
-								<div class="text-muted-foreground w-[90px] text-end text-xs">
-									{formatBytes(file.sizeBytes)}
-								</div>
-							</div>
-						</Item>
+								</Item>
+							{/snippet}
+						</DocumentContextMenu>
 					{/each}
 				</div>
 			{/if}
@@ -248,7 +288,7 @@
 				</div>
 			<div class="flex flex-col gap-3">
 				{#each favoriteFiles as file (file.id)}
-					<FileCard {file} />
+					<FileCard {file} href={`/document/${file.id}`} onchange={loadData} onFavoriteToggle={(val) => handleFavoriteToggle(file.id, val)} />
 				{/each}
 			</div>
 			</div>
@@ -259,9 +299,9 @@
 					<h2 class="text-lg font-medium">Sugeridos</h2>
 				</div>
 				<div class="flex flex-col gap-3">
-					{#each suggestedFiles as file (file.id)}
-						<FileCard {file} />
-					{/each}
+				{#each suggestedFiles as file (file.id)}
+					<FileCard {file} href={`/document/${file.id}`} onchange={loadData} onFavoriteToggle={(val) => handleFavoriteToggle(file.id, val)} />
+				{/each}
 				</div>
 			</div>
 		</section>
