@@ -10,7 +10,6 @@ import tomli
 from ocr_server.proto import ocr_pb2, ocr_pb2_grpc
 from ocr_server.pipeline import pdf as pdf_pipeline
 from ocr_server.pipeline import image as image_pipeline
-from ocr_server.pipeline import markitdown_
 from ocr_server.queue import OCRQueue
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -64,6 +63,8 @@ def _extract_text(doc_id: str, file_path: str, file_type: str, engine: str) -> s
     if ext in IMAGE_EXTS:
         return image_pipeline.extract_text([file_path], engine)
 
+    # Office / unknown — lazy-import markitdown (avoids onnxruntime at startup)
+    from ocr_server.pipeline import markitdown_
     return markitdown_.extract_text(file_path)
 
 
