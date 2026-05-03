@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"SebasXeon/Fileoteca/internal/addfile"
+	"SebasXeon/Fileoteca/internal/classifier"
 	"SebasXeon/Fileoteca/internal/ocr"
 	"SebasXeon/Fileoteca/internal/shell"
 
@@ -107,6 +108,9 @@ func main() {
 			ocrWorker.Start()
 			defer ocrWorker.Stop()
 
+			classifierMgr := classifier.NewClassifierManager(app, "pb_data/models")
+			classifierMgr.Load()
+
 			app.OnRecordCreate("documents").BindFunc(func(e *core.RecordEvent) error {
 				go func() {
 					resolvedPath, cleanup, err := ocr.ResolvePath(e.Record)
@@ -118,11 +122,31 @@ func main() {
 						ID:       e.Record.Id,
 						FilePath: resolvedPath,
 						FileType: e.Record.GetString("file_ext"),
+						OnComplete: func(ocrText string) {
+							classifierMgr.ClassifyAndAssign(e.Record.Id, ocrText)
+						},
 					})
 					go func() {
 						time.Sleep(5 * time.Minute)
 						cleanup()
 					}()
+				}()
+				return e.Next()
+			})
+
+			app.OnRecordUpdate("documents").BindFunc(func(e *core.RecordEvent) error {
+				go func() {
+					oldSub := e.Record.Original().GetString("subcategory_id")
+					newSub := e.Record.GetString("subcategory_id")
+					if oldSub != newSub && newSub != "" {
+						cfg, _ := shell.LoadConfig()
+						if newSub == cfg.DefaultSubcategoryID {
+							return
+						}
+						if err := classifierMgr.Retrain(newSub); err != nil {
+							log.Printf("classifier: retrain error: %v", err)
+						}
+					}
 				}()
 				return e.Next()
 			})
