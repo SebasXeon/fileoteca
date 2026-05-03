@@ -13,9 +13,10 @@ import (
 )
 
 type OcrJob struct {
-	ID       string
-	FilePath string
-	FileType string
+	ID         string
+	FilePath   string
+	FileType   string
+	OnComplete func(ocrText string)
 }
 
 type OcrWorker struct {
@@ -74,6 +75,10 @@ func (w *OcrWorker) processJob(job OcrJob) {
 
 	w.updateDocumentStatus(job.ID, "processed", text)
 	log.Printf("OCR complete for document %s (%d chars)", job.ID, len(text))
+
+	if job.OnComplete != nil {
+		job.OnComplete(text)
+	}
 }
 
 func (w *OcrWorker) updateDocumentStatus(id string, status string, ocrText string) {
