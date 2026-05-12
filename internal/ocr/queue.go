@@ -111,19 +111,18 @@ func (w *OcrWorker) generateAndUploadThumbnail(job OcrJob) {
 	}
 	defer os.Remove(thumbPath)
 
-	err = w.app.RunInTransaction(func(txApp core.App) error {
-		record, err := txApp.FindRecordById("documents", job.ID)
-		if err != nil {
-			return fmt.Errorf("record not found %s: %w", job.ID, err)
-		}
-		file, err := filesystem.NewFileFromPath(thumbPath)
-		if err != nil {
-			return fmt.Errorf("failed to read thumbnail file: %w", err)
-		}
-		record.Set("thumbnail", file)
-		return txApp.Save(record)
-	})
+	record, err := w.app.FindRecordById("documents", job.ID)
 	if err != nil {
+		log.Printf("Failed to find record %s for thumbnail: %v", job.ID, err)
+		return
+	}
+	file, err := filesystem.NewFileFromPath(thumbPath)
+	if err != nil {
+		log.Printf("Failed to read thumbnail file for %s: %v", job.ID, err)
+		return
+	}
+	record.Set("thumbnail", file)
+	if err := w.app.Save(record); err != nil {
 		log.Printf("Failed to upload thumbnail for %s: %v", job.ID, err)
 	} else {
 		log.Printf("Thumbnail saved for document %s", job.ID)
