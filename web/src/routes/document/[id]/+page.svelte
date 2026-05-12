@@ -226,6 +226,11 @@
 						<Card.Title>Información</Card.Title>
 					</Card.Header>
 					<Card.Content class="flex flex-col gap-3 text-sm">
+						{#if doc.thumbnail}
+							<div class="rounded-lg overflow-hidden bg-muted">
+								<img src={doc.thumbnail} alt={doc.name} class="w-full h-auto object-cover max-h-48" />
+							</div>
+						{/if}
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">Nombre</span>
 							<span class="truncate max-w-[180px]">{doc.name}</span>
