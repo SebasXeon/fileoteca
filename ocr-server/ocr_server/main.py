@@ -10,6 +10,7 @@ import tomli
 from ocr_server.proto import ocr_pb2, ocr_pb2_grpc
 from ocr_server.pipeline import pdf as pdf_pipeline
 from ocr_server.pipeline import image as image_pipeline
+from ocr_server.pipeline import thumbnail as thumbnail_pipeline
 from ocr_server.queue import OCRQueue
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -45,6 +46,17 @@ class OCRService(ocr_pb2_grpc.OCREngineServicer):
             context.set_details(str(exc))
             logger.error("OCR failed for %s: %s", request.id, exc)
             return ocr_pb2.ExtractResponse(text="")
+
+    def GenerateThumbnail(self, request, context):
+        logger.info("Generating thumbnail for %s (%s)", request.id, request.file_type)
+        try:
+            path = thumbnail_pipeline.generate_thumbnail(request.file_path, request.file_type)
+            return ocr_pb2.ThumbnailResponse(thumbnail_path=path or "")
+        except Exception as exc:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(exc))
+            logger.error("Thumbnail failed for %s: %s", request.id, exc)
+            return ocr_pb2.ThumbnailResponse(thumbnail_path="")
 
 
 def _extract_text(doc_id: str, file_path: str, file_type: str, engine: str) -> str:
