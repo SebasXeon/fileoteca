@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v6.31.1
-// source: internal/ocr/proto/ocr.proto
+// source: ocr.proto
 
 package proto
 
@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OCREngine_ExtractText_FullMethodName = "/ocr.OCREngine/ExtractText"
+	OCREngine_ExtractText_FullMethodName       = "/ocr.OCREngine/ExtractText"
+	OCREngine_GenerateThumbnail_FullMethodName = "/ocr.OCREngine/GenerateThumbnail"
 )
 
 // OCREngineClient is the client API for OCREngine service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type OCREngineClient interface {
 	ExtractText(ctx context.Context, in *ExtractRequest, opts ...grpc.CallOption) (*ExtractResponse, error)
+	GenerateThumbnail(ctx context.Context, in *ThumbnailRequest, opts ...grpc.CallOption) (*ThumbnailResponse, error)
 }
 
 type oCREngineClient struct {
@@ -47,11 +49,22 @@ func (c *oCREngineClient) ExtractText(ctx context.Context, in *ExtractRequest, o
 	return out, nil
 }
 
+func (c *oCREngineClient) GenerateThumbnail(ctx context.Context, in *ThumbnailRequest, opts ...grpc.CallOption) (*ThumbnailResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ThumbnailResponse)
+	err := c.cc.Invoke(ctx, OCREngine_GenerateThumbnail_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OCREngineServer is the server API for OCREngine service.
 // All implementations must embed UnimplementedOCREngineServer
 // for forward compatibility.
 type OCREngineServer interface {
 	ExtractText(context.Context, *ExtractRequest) (*ExtractResponse, error)
+	GenerateThumbnail(context.Context, *ThumbnailRequest) (*ThumbnailResponse, error)
 	mustEmbedUnimplementedOCREngineServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedOCREngineServer struct{}
 
 func (UnimplementedOCREngineServer) ExtractText(context.Context, *ExtractRequest) (*ExtractResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExtractText not implemented")
+}
+func (UnimplementedOCREngineServer) GenerateThumbnail(context.Context, *ThumbnailRequest) (*ThumbnailResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateThumbnail not implemented")
 }
 func (UnimplementedOCREngineServer) mustEmbedUnimplementedOCREngineServer() {}
 func (UnimplementedOCREngineServer) testEmbeddedByValue()                   {}
@@ -104,6 +120,24 @@ func _OCREngine_ExtractText_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OCREngine_GenerateThumbnail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ThumbnailRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OCREngineServer).GenerateThumbnail(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OCREngine_GenerateThumbnail_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OCREngineServer).GenerateThumbnail(ctx, req.(*ThumbnailRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OCREngine_ServiceDesc is the grpc.ServiceDesc for OCREngine service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -115,7 +149,11 @@ var OCREngine_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "ExtractText",
 			Handler:    _OCREngine_ExtractText_Handler,
 		},
+		{
+			MethodName: "GenerateThumbnail",
+			Handler:    _OCREngine_GenerateThumbnail_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/ocr/proto/ocr.proto",
+	Metadata: "ocr.proto",
 }
