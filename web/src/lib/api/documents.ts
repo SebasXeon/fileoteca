@@ -8,6 +8,10 @@ function toExplorerFile(record: Record<string, unknown>): ExplorerFile {
 	const categoryName = (categoryRecord?.name as string) ?? "";
 	const subName = (subcategoryRecord?.name as string) ?? "";
 	const location = [categoryName, subName].filter(Boolean).join(" / ") || "Sin categoría";
+	const rawThumb = record.thumbnail;
+	const thumbUrl = (rawThumb && typeof rawThumb === "string" && rawThumb.length > 0)
+		? `${pb.baseUrl}/api/files/documents/${record.id}/${rawThumb}`
+		: undefined;
 
 	return {
 		id: record.id as string,
@@ -18,7 +22,7 @@ function toExplorerFile(record: Record<string, unknown>): ExplorerFile {
 		locationLabel: location,
 		category: categoryName || undefined,
 		favorite: Boolean(record.is_favorite),
-		thumbnail: record.thumbnail ? pb.files.getURL(record as any, record.thumbnail as string) : undefined,
+		thumbnail: thumbUrl,
 	};
 }
 
@@ -73,6 +77,11 @@ export async function getDocument(id: string): Promise<DocumentDetail> {
 	const subName = (subcategoryRecord?.name as string) ?? "";
 	const location = [categoryName, subName].filter(Boolean).join(" / ") || "Sin categoría";
 
+	const rawThumb = raw.thumbnail;
+	const thumbUrl = (rawThumb && typeof rawThumb === "string" && rawThumb.length > 0)
+		? `${pb.baseUrl}/api/files/documents/${raw.id}/${rawThumb}`
+		: undefined;
+
 	return {
 		id: raw.id as string,
 		name: raw.name as string,
@@ -82,7 +91,7 @@ export async function getDocument(id: string): Promise<DocumentDetail> {
 		locationLabel: location,
 		category: categoryName || undefined,
 		favorite: Boolean(raw.is_favorite),
-		thumbnail: raw.thumbnail ? pb.files.getURL(raw as any, raw.thumbnail as string) : undefined,
+		thumbnail: thumbUrl,
 		path: (raw.path as string) || undefined,
 		file: (raw.file as string) || undefined,
 		notes: (raw.notes as string) || undefined,
