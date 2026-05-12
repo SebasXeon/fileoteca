@@ -15,6 +15,7 @@ export type ExplorerFile = {
 	locationLabel: string;
 	category?: string;
 	favorite?: boolean;
+	thumbnail?: string;
 	suggestedReason?: string;
 };
 

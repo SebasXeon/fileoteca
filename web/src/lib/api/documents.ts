@@ -18,6 +18,7 @@ function toExplorerFile(record: Record<string, unknown>): ExplorerFile {
 		locationLabel: location,
 		category: categoryName || undefined,
 		favorite: Boolean(record.is_favorite),
+		thumbnail: record.thumbnail ? pb.files.getURL(record as any, record.thumbnail as string) : undefined,
 	};
 }
 
@@ -47,6 +48,7 @@ export async function getFavoriteDocuments(): Promise<ExplorerFile[]> {
 }
 
 export type DocumentDetail = ExplorerFile & {
+	thumbnail?: string;
 	path?: string;
 	file?: string;
 	notes?: string;
@@ -80,6 +82,7 @@ export async function getDocument(id: string): Promise<DocumentDetail> {
 		locationLabel: location,
 		category: categoryName || undefined,
 		favorite: Boolean(raw.is_favorite),
+		thumbnail: raw.thumbnail ? pb.files.getURL(raw as any, raw.thumbnail as string) : undefined,
 		path: (raw.path as string) || undefined,
 		file: (raw.file as string) || undefined,
 		notes: (raw.notes as string) || undefined,
