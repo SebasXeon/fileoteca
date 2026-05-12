@@ -4,6 +4,7 @@ package ocr;
 
 service OCREngine {
     rpc ExtractText(ExtractRequest) returns (ExtractResponse);
+    rpc GenerateThumbnail(ThumbnailRequest) returns (ThumbnailResponse);
 }
 
 message ExtractRequest {
@@ -14,4 +15,14 @@ message ExtractRequest {
 
 message ExtractResponse {
     string text = 1;
+}
+
+message ThumbnailRequest {
+    string id = 1;
+    string file_path = 2;
+    string file_type = 3;
+}
+
+message ThumbnailResponse {
+    string thumbnail_path = 1;
 }
