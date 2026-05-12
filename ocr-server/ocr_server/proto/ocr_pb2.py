@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\tocr.proto\x12\x03ocr\"B\n\x0e\x45xtractRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x11\n\tfile_path\x18\x02 \x01(\t\x12\x11\n\tfile_type\x18\x03 \x01(\t\"\x1f\n\x0f\x45xtractResponse\x12\x0c\n\x04text\x18\x01 \x01(\t2E\n\tOCREngine\x12\x38\n\x0b\x45xtractText\x12\x13.ocr.ExtractRequest\x1a\x14.ocr.ExtractResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\tocr.proto\x12\x03ocr\"B\n\x0e\x45xtractRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x11\n\tfile_path\x18\x02 \x01(\t\x12\x11\n\tfile_type\x18\x03 \x01(\t\"\x1f\n\x0f\x45xtractResponse\x12\x0c\n\x04text\x18\x01 \x01(\t\"D\n\x10ThumbnailRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x11\n\tfile_path\x18\x02 \x01(\t\x12\x11\n\tfile_type\x18\x03 \x01(\t\"+\n\x11ThumbnailResponse\x12\x16\n\x0ethumbnail_path\x18\x01 \x01(\t2\x89\x01\n\tOCREngine\x12\x38\n\x0b\x45xtractText\x12\x13.ocr.ExtractRequest\x1a\x14.ocr.ExtractResponse\x12\x42\n\x11GenerateThumbnail\x12\x15.ocr.ThumbnailRequest\x1a\x16.ocr.ThumbnailResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,6 +35,10 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_EXTRACTREQUEST']._serialized_end=84
   _globals['_EXTRACTRESPONSE']._serialized_start=86
   _globals['_EXTRACTRESPONSE']._serialized_end=117
-  _globals['_OCRENGINE']._serialized_start=119
-  _globals['_OCRENGINE']._serialized_end=188
+  _globals['_THUMBNAILREQUEST']._serialized_start=119
+  _globals['_THUMBNAILREQUEST']._serialized_end=187
+  _globals['_THUMBNAILRESPONSE']._serialized_start=189
+  _globals['_THUMBNAILRESPONSE']._serialized_end=232
+  _globals['_OCRENGINE']._serialized_start=235
+  _globals['_OCRENGINE']._serialized_end=372
 # @@protoc_insertion_point(module_scope)

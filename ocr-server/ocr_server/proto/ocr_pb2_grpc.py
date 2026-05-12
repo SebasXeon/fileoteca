@@ -39,12 +39,23 @@ class OCREngineStub(object):
                 request_serializer=ocr__pb2.ExtractRequest.SerializeToString,
                 response_deserializer=ocr__pb2.ExtractResponse.FromString,
                 _registered_method=True)
+        self.GenerateThumbnail = channel.unary_unary(
+                '/ocr.OCREngine/GenerateThumbnail',
+                request_serializer=ocr__pb2.ThumbnailRequest.SerializeToString,
+                response_deserializer=ocr__pb2.ThumbnailResponse.FromString,
+                _registered_method=True)
 
 
 class OCREngineServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def ExtractText(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GenerateThumbnail(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -57,6 +68,11 @@ def add_OCREngineServicer_to_server(servicer, server):
                     servicer.ExtractText,
                     request_deserializer=ocr__pb2.ExtractRequest.FromString,
                     response_serializer=ocr__pb2.ExtractResponse.SerializeToString,
+            ),
+            'GenerateThumbnail': grpc.unary_unary_rpc_method_handler(
+                    servicer.GenerateThumbnail,
+                    request_deserializer=ocr__pb2.ThumbnailRequest.FromString,
+                    response_serializer=ocr__pb2.ThumbnailResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -86,6 +102,33 @@ class OCREngine(object):
             '/ocr.OCREngine/ExtractText',
             ocr__pb2.ExtractRequest.SerializeToString,
             ocr__pb2.ExtractResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GenerateThumbnail(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ocr.OCREngine/GenerateThumbnail',
+            ocr__pb2.ThumbnailRequest.SerializeToString,
+            ocr__pb2.ThumbnailResponse.FromString,
             options,
             channel_credentials,
             insecure,
