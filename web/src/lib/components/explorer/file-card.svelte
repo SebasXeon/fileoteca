@@ -57,9 +57,13 @@
 	{#if variant === "suggested"}
 		<Card.Content class="pt-0">
 			<div class="flex gap-3">
-				<div class="bg-muted mt-6 flex size-10 items-center justify-center rounded-2xl">
+			<div class="bg-muted mt-6 flex size-10 items-center justify-center rounded-2xl overflow-hidden">
+				{#if file.thumbnail}
+					<img src={file.thumbnail} alt="" class="size-full object-cover" />
+				{:else}
 					<Icon class="text-muted-foreground size-5" />
-				</div>
+				{/if}
+			</div>
 				<div class="min-w-0 flex-1 py-6">
 					<div class="flex items-start justify-between gap-2">
 						<div class="min-w-0">
@@ -79,9 +83,13 @@
 	{:else}
 		<Card.Header>
 			<div class="flex gap-3 min-w-0">
-				<div class="bg-muted flex size-10 items-center justify-center rounded-2xl" aria-hidden="true">
+			<div class="bg-muted flex size-10 items-center justify-center rounded-2xl overflow-hidden" aria-hidden="true">
+				{#if file.thumbnail}
+					<img src={file.thumbnail} alt="" class="size-full object-cover" />
+				{:else}
 					<Icon class="text-muted-foreground size-5" />
-				</div>
+				{/if}
+			</div>
 				<div class="min-w-0 flex-1">
 					<Card.Title class="truncate">{file.name}</Card.Title>
 					<Card.Description class="truncate">{file.locationLabel}</Card.Description>
