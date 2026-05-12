@@ -29,6 +29,7 @@
 	type TypeFilter = "all" | "pdf" | "docx" | "xlsx" | "image";
 
 	let query = $state("");
+	let debouncedQuery = $state("");
 	let view: ViewMode = $state("grid");
 	let sort: SortMode = $state("recent");
 	let typeFilter: TypeFilter = $state("all");
@@ -37,13 +38,41 @@
 	let loading = $state(false);
 	let error = $state("");
 	let searched = $state(false);
+	let initialLoad = $state(true);
+
+	$effect(() => {
+		const val = query;
+		const timer = setTimeout(() => {
+			debouncedQuery = val;
+		}, 300);
+		return () => clearTimeout(timer);
+	});
+
+	$effect(() => {
+		if (initialLoad) return;
+		const trimmed = debouncedQuery.trim();
+		if (trimmed) {
+			const url = new URL($page.url);
+			url.searchParams.set("q", trimmed);
+			goto(url.toString(), { replaceState: true, noScroll: true });
+			doSearch(trimmed);
+		} else {
+			const url = new URL($page.url);
+			url.searchParams.delete("q");
+			goto(url.toString(), { replaceState: true, noScroll: true });
+			results = [];
+			searched = false;
+		}
+	});
 
 	onMount(() => {
 		const q = $page.url.searchParams.get("q") ?? "";
 		if (q) {
 			query = q;
+			debouncedQuery = q;
 			doSearch(q);
 		}
+		initialLoad = false;
 	});
 
 	async function doSearch(q: string) {
@@ -62,24 +91,6 @@
 			error = String(err);
 		} finally {
 			loading = false;
-		}
-	}
-
-	function handleSearch() {
-		const trimmed = query.trim();
-		const url = new URL($page.url);
-		if (trimmed) {
-			url.searchParams.set("q", trimmed);
-		} else {
-			url.searchParams.delete("q");
-		}
-		goto(url.toString(), { replaceState: true });
-		doSearch(trimmed);
-	}
-
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === "Enter") {
-			handleSearch();
 		}
 	}
 
@@ -133,7 +144,6 @@
 					bind:value={query}
 					placeholder="Buscar por nombre, contenido o texto extraído…"
 					class="pl-9"
-					onkeydown={handleKeydown}
 				/>
 				{#if query}
 					<button

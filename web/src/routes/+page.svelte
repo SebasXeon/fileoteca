@@ -49,6 +49,22 @@
 	let loading = $state(true);
 	let error = $state("");
 	let showAllFavorites = $state(false);
+	let debouncedQuery = $state("");
+
+	$effect(() => {
+		const val = query;
+		const timer = setTimeout(() => {
+			debouncedQuery = val;
+		}, 300);
+		return () => clearTimeout(timer);
+	});
+
+	$effect(() => {
+		const trimmed = debouncedQuery.trim();
+		if (trimmed.length >= 2) {
+			goto(`/search?q=${encodeURIComponent(trimmed)}`);
+		}
+	});
 
 	const visibleFavorites = $derived(showAllFavorites ? allFavorites : favoriteFiles);
 
@@ -159,11 +175,6 @@
 					bind:value={query}
 					placeholder="Buscar por nombre, categoría o ubicación…"
 					class="pl-9"
-					onkeydown={(e) => {
-						if (e.key === "Enter" && query.trim()) {
-							goto(`/search?q=${encodeURIComponent(query.trim())}`);
-						}
-					}}
 				/>
 			</div>
 
