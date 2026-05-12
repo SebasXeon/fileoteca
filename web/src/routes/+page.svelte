@@ -29,6 +29,7 @@
 	import {
 		getRecentDocuments,
 		getFavoriteDocuments,
+		getSuggestedDocuments,
 	} from "$lib/api";
 	import DocumentContextMenu from "$lib/components/explorer/document-context-menu.svelte";
 
@@ -43,9 +44,13 @@
 
 	let recentFiles = $state<ExplorerFile[]>([]);
 	let favoriteFiles = $state<ExplorerFile[]>([]);
+	let allFavorites = $state<ExplorerFile[]>([]);
 	let suggestedFiles = $state<ExplorerFile[]>([]);
 	let loading = $state(true);
 	let error = $state("");
+	let showAllFavorites = $state(false);
+
+	const visibleFavorites = $derived(showAllFavorites ? allFavorites : favoriteFiles);
 
 	onMount(async () => {
 		await loadData();
@@ -55,13 +60,15 @@
 		loading = true;
 		error = "";
 		try {
-			const [recent, favorites] = await Promise.all([
+			const [recent, favorites, suggested] = await Promise.all([
 				getRecentDocuments(),
 				getFavoriteDocuments(),
+				getSuggestedDocuments(),
 			]);
-			recentFiles = recent;
-			favoriteFiles = favorites.length > 0 ? favorites : recent.filter((f) => f.favorite);
-			suggestedFiles = recent.filter((f) => f.suggestedReason).slice(0, 4);
+			recentFiles = recent.slice(0, 8);
+			allFavorites = favorites;
+			favoriteFiles = favorites.slice(0, 4);
+			suggestedFiles = suggested;
 		} catch (err) {
 			error = String(err);
 		} finally {
@@ -75,13 +82,23 @@
 			recentFiles[recentIdx] = { ...recentFiles[recentIdx], favorite: isFavorite };
 		}
 
+		const allFavsIdx = allFavorites.findIndex((f) => f.id === id);
+		if (allFavsIdx !== -1) {
+			allFavorites[allFavsIdx] = { ...allFavorites[allFavsIdx], favorite: isFavorite };
+		}
+
 		if (isFavorite) {
 			const alreadyInFavs = favoriteFiles.find((f) => f.id === id);
+			const alreadyInAll = allFavorites.find((f) => f.id === id);
 			if (!alreadyInFavs && recentIdx !== -1) {
 				favoriteFiles = [...favoriteFiles, recentFiles[recentIdx]];
 			}
+			if (!alreadyInAll && recentIdx !== -1) {
+				allFavorites = [...allFavorites, recentFiles[recentIdx]];
+			}
 		} else {
 			favoriteFiles = favoriteFiles.filter((f) => f.id !== id);
+			allFavorites = allFavorites.filter((f) => f.id !== id);
 		}
 
 		const suggestedIdx = suggestedFiles.findIndex((f) => f.id === id);
@@ -232,7 +249,7 @@
 					<ClockIcon class="size-4 text-pink-500" />
 					<h2 class="text-lg font-medium">Recientes</h2>
 				</div>
-				<Button variant="ghost" size="sm">Ver todo</Button>
+				<Button variant="ghost" size="sm" onclick={() => goto("/documents")}>Ver todo</Button>
 			</div>
 
 			{#if view === "grid"}
@@ -282,12 +299,19 @@
 
 		<section class="grid gap-6 lg:grid-cols-2">
 			<div class="flex flex-col gap-4">
-				<div class="flex items-center gap-2 bg-amber-200 rounded-3xl px-3 py-1 w-fit">
-					<StarIcon class="size-4 text-yellow-500" />
-					<h2 class="text-lg font-medium">Favoritos</h2>
+				<div class="flex items-center justify-between gap-3">
+					<div class="flex items-center gap-2 bg-amber-200 rounded-3xl px-3 py-1 w-fit">
+						<StarIcon class="size-4 text-yellow-500" />
+						<h2 class="text-lg font-medium">Favoritos</h2>
+					</div>
+					{#if allFavorites.length > 4}
+						<Button variant="ghost" size="sm" onclick={() => (showAllFavorites = !showAllFavorites)}>
+							{showAllFavorites ? "Ver menos" : "Ver más"}
+						</Button>
+					{/if}
 				</div>
 			<div class="flex flex-col gap-3">
-				{#each favoriteFiles as file (file.id)}
+				{#each visibleFavorites as file (file.id)}
 					<FileCard {file} href={`/document/${file.id}`} onchange={loadData} onFavoriteToggle={(val) => handleFavoriteToggle(file.id, val)} />
 				{/each}
 			</div>

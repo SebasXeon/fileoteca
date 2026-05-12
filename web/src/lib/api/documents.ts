@@ -169,6 +169,40 @@ export async function getCategoriesWithSubcategories(): Promise<{ id: string; na
 	}));
 }
 
+export async function getSuggestedDocuments(): Promise<ExplorerFile[]> {
+	const result = await pb.collection("documents").getList(1, 10, {
+		sort: "-created",
+		expand: "category_id,subcategory_id",
+	});
+	const recent = mapItems(result.items);
+	if (recent.length === 0) return [];
+
+	const seed = recent[0];
+	const rawSeed = result.items[0] as unknown as Record<string, unknown>;
+	const seedCategoryId = rawSeed.category_id as string | undefined;
+	const seedId = seed.id;
+
+	if (!seedCategoryId) {
+		return recent.slice(0, 4);
+	}
+
+	const relatedResult = await pb.collection("documents").getList(1, 3, {
+		filter: `category_id = "${seedCategoryId}" && id != "${seedId}"`,
+		sort: "-created",
+		expand: "category_id,subcategory_id",
+	});
+	const related = mapItems(relatedResult.items);
+
+	const suggested: ExplorerFile[] = related.slice(0, 3);
+	if (suggested.length < 3) {
+		const usedIds = new Set([seedId, ...suggested.map((r) => r.id)]);
+		const remaining = recent.filter((r) => !usedIds.has(r.id));
+		suggested.push(...remaining.slice(0, 3 - suggested.length));
+	}
+
+	return [seed, ...suggested].slice(0, 4);
+}
+
 export async function deleteDocument(id: string): Promise<void> {
 	await pb.collection("documents").delete(id);
 }
