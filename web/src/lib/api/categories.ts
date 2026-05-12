@@ -21,6 +21,7 @@ function toDocFile(record: Record<string, unknown>): ExplorerFile {
 		updatedAt: new Date(record.updated as string),
 		locationLabel: location,
 		category: categoryName || undefined,
+		subcategory_id: (record.subcategory_id as string) || undefined,
 		favorite: Boolean(record.is_favorite),
 		thumbnail: thumbUrl,
 	};
@@ -30,6 +31,7 @@ function toExplorerCategory(
 	record: Record<string, unknown>,
 	subcategories: Record<string, unknown>[],
 	documentCount: number,
+	subDocumentCounts: Map<string, number>,
 ): ExplorerCategory {
 	const expand = record.expand as Record<string, Record<string, unknown>> | undefined;
 	const iconRecord = expand?.icon_id as Record<string, unknown> | undefined;
@@ -43,7 +45,7 @@ function toExplorerCategory(
 		subcategories: subcategories.map((sub) => ({
 			id: sub.id as string,
 			name: sub.name as string,
-			count: 0,
+			count: subDocumentCounts.get(sub.id as string) ?? 0,
 		})),
 	};
 }
@@ -58,15 +60,19 @@ export async function getCategories(): Promise<ExplorerCategory[]> {
 	const rawSubcategories = subcategories.map((s) => s as unknown as Record<string, unknown>);
 
 	const documentCounts = new Map<string, number>();
-	for (const doc of await pb.collection("documents").getFullList({ fields: "category_id" })) {
+	const subDocumentCounts = new Map<string, number>();
+	for (const doc of await pb.collection("documents").getFullList({ fields: "category_id,subcategory_id" })) {
 		const rawDoc = doc as unknown as Record<string, unknown>;
 		const cid = rawDoc.category_id as string;
+		const sid = rawDoc.subcategory_id as string;
 		if (cid) documentCounts.set(cid, (documentCounts.get(cid) ?? 0) + 1);
+		if (sid) subDocumentCounts.set(sid, (subDocumentCounts.get(sid) ?? 0) + 1);
 	}
 
 	return rawCategories.map((cat) => {
-		const subs = rawSubcategories.filter((sub) => sub.category_id === cat.id);
-		return toExplorerCategory(cat, subs, documentCounts.get(cat.id as string) ?? 0);
+		const catId = cat.id as string;
+		const subs = rawSubcategories.filter((sub) => sub.category_id === catId);
+		return toExplorerCategory(cat, subs, documentCounts.get(catId) ?? 0, subDocumentCounts);
 	});
 }
 

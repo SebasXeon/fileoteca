@@ -76,7 +76,7 @@
 		const q = debouncedQuery.trim().toLowerCase();
 		let docs = documents;
 		if (selectedSub !== "all") {
-			docs = docs.filter((d: any) => d.subcategory_id === selectedSub);
+			docs = docs.filter((d) => d.subcategory_id === selectedSub);
 		}
 		if (q) {
 			docs = docs.filter((d) =>
@@ -132,9 +132,9 @@
 									onclick={() => (selectedSub = sub.id)}
 								>
 									<span class="truncate">{sub.name}</span>
-									<Badge variant="secondary">
-										{documents.filter((d: any) => d.subcategory_id === sub.id).length}
-									</Badge>
+										<Badge variant="secondary">
+											{documents.filter((d) => d.subcategory_id === sub.id).length}
+										</Badge>
 								</button>
 							{/each}
 						</div>

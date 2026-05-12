@@ -14,6 +14,7 @@ export type ExplorerFile = {
 	updatedAt: Date;
 	locationLabel: string;
 	category?: string;
+	subcategory_id?: string;
 	favorite?: boolean;
 	thumbnail?: string;
 	suggestedReason?: string;

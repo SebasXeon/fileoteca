@@ -21,6 +21,7 @@ function toExplorerFile(record: Record<string, unknown>): ExplorerFile {
 		updatedAt: new Date(record.updated as string),
 		locationLabel: location,
 		category: categoryName || undefined,
+		subcategory_id: (record.subcategory_id as string) || undefined,
 		favorite: Boolean(record.is_favorite),
 		thumbnail: thumbUrl,
 	};
