@@ -159,6 +159,11 @@
 					bind:value={query}
 					placeholder="Buscar por nombre, categoría o ubicación…"
 					class="pl-9"
+					onkeydown={(e) => {
+						if (e.key === "Enter" && query.trim()) {
+							goto(`/search?q=${encodeURIComponent(query.trim())}`);
+						}
+					}}
 				/>
 			</div>
 

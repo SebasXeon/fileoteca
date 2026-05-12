@@ -203,6 +203,18 @@ export async function getSuggestedDocuments(): Promise<ExplorerFile[]> {
 	return [seed, ...suggested].slice(0, 4);
 }
 
+export async function searchDocuments(query: string): Promise<ExplorerFile[]> {
+	const q = query.trim();
+	if (!q) return [];
+	const filter = `name ~ "${q}" || file_name ~ "${q}" || ocr_txt ~ "${q}"`;
+	const result = await pb.collection("documents").getList(1, 50, {
+		filter,
+		sort: "-created",
+		expand: "category_id,subcategory_id",
+	});
+	return mapItems(result.items);
+}
+
 export async function deleteDocument(id: string): Promise<void> {
 	await pb.collection("documents").delete(id);
 }
