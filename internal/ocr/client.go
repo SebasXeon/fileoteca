@@ -61,6 +61,24 @@ func (c *OcrClient) ExtractText(ctx context.Context, id, filePath, fileType stri
 	return resp.Text, nil
 }
 
+func (c *OcrClient) GenerateThumbnail(ctx context.Context, id, filePath, fileType string) (string, error) {
+	req := &proto.ThumbnailRequest{
+		Id:       id,
+		FilePath: filePath,
+		FileType: fileType,
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	resp, err := c.client.GenerateThumbnail(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("GenerateThumbnail failed for %s: %w", id, err)
+	}
+
+	return resp.ThumbnailPath, nil
+}
+
 func (c *OcrClient) Close() error {
 	return c.conn.Close()
 }
