@@ -45,4 +45,4 @@ ocr-server/.pytest_cache/
 .vscode/
 .idea/
 *.log
-./opencode
+./opencode/**
