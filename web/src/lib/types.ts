@@ -32,6 +32,7 @@ export type ExplorerCategory = {
 export type ExplorerFolder = {
 	id: string;
 	name: string;
+	description?: string;
 	parentId?: string;
 	count: number;
 	updatedAt: Date;
