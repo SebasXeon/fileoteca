@@ -1,9 +1,48 @@
+# --- Svelte / Node.js Specifics ---
+node_modules/
+.svelte-kit/
+.vercel/
+.netlify/
+build/
+dist/
+.env
+.env.*
+!.env.example
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# --- Go Specifics ---
+# Binaries and executables
+bin/
+main
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.db
+
+# Dependency directories
+vendor/
+
+# Pocketbase
+pb_data/**
+pb_data/*.db
+
+# Go test coverage
+*.out
+
+# --- Python Specifics ---
 ocr-server/.venv/
 ocr-server/__pycache__/
 ocr-server/ocr_server/**/__pycache__/
 ocr-server/*.egg-info/
 ocr-server/.pytest_cache/
-pb_data/
-*.exe
-.opencode/*
+
+# --- General / IDE ---
+.DS_Store
 .vscode/
+.idea/
+*.log
+./opencode
