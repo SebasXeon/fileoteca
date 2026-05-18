@@ -1,7 +1,7 @@
 import pb from "$lib/pocketbase";
 import type { ExplorerFile, FileKind } from "$lib/types";
 
-function toExplorerFile(record: Record<string, unknown>): ExplorerFile {
+export function toExplorerFile(record: Record<string, unknown>): ExplorerFile {
 	const expand = record.expand as Record<string, Record<string, unknown>> | undefined;
 	const categoryRecord = expand?.category_id as Record<string, unknown> | undefined;
 	const subcategoryRecord = expand?.subcategory_id as Record<string, unknown> | undefined;
@@ -27,7 +27,7 @@ function toExplorerFile(record: Record<string, unknown>): ExplorerFile {
 	};
 }
 
-function mapItems(items: Array<unknown>): ExplorerFile[] {
+export function mapItems(items: Array<unknown>): ExplorerFile[] {
 	return items.map((r) => toExplorerFile(r as Record<string, unknown>));
 }
 
