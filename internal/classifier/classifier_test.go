@@ -20,7 +20,7 @@ func TestClassifierManagerLoadEmpty(t *testing.T) {
 
 func TestClassifierManagerClassifyAndAssignNoModel(t *testing.T) {
 	mgr := &ClassifierManager{modelsDir: t.TempDir()}
-	mgr.ClassifyAndAssign("doc123", "some ocr text")
+	mgr.ClassifyAndAssign("doc123", "some ocr text", "default_sub")
 }
 
 func TestRebuildClassifier(t *testing.T) {
@@ -29,7 +29,7 @@ func TestRebuildClassifier(t *testing.T) {
 		"subcat_b": {"contrato arrendamiento vivienda clausulas", "contrato alquiler apartamento"},
 	}
 
-	c := rebuildClassifierFromData(trainingData, 50)
+	c := rebuildClassifierFromData(trainingData, 50, 1)
 	if c == nil {
 		t.Fatal("rebuildClassifierFromData returned nil")
 	}
@@ -61,7 +61,7 @@ func TestClassifierManagerRetrain(t *testing.T) {
 		"subcat_facturas": {"factura pago enero electricidad consumo", "factura febrero luz"},
 	}
 
-	c := rebuildClassifierFromData(trainingData, 50)
+	c := rebuildClassifierFromData(trainingData, 50, 1)
 	path := filepath.Join(dir, "classifier.model")
 	if err := SaveModel(path, c); err != nil {
 		t.Fatal(err)

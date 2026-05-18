@@ -2,5 +2,8 @@ ocr-server/.venv/
 ocr-server/__pycache__/
 ocr-server/ocr_server/**/__pycache__/
 ocr-server/*.egg-info/
+ocr-server/.pytest_cache/
 pb_data/
-Fileoteca.exe
+*.exe
+.opencode
+.vscode

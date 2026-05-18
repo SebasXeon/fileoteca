@@ -111,6 +111,13 @@ func main() {
 			classifierMgr := classifier.NewClassifierManager(app, "pb_data/models")
 			classifierMgr.Load()
 
+			retrainQueue := classifier.NewRetrainQueue(app, classifierMgr)
+			retrainQueue.Start()
+			defer retrainQueue.Stop()
+
+			cfg, _ := shell.LoadConfig()
+			defaultSubID := cfg.DefaultSubcategoryID
+
 			app.OnRecordCreate("documents").BindFunc(func(e *core.RecordEvent) error {
 				go func() {
 					resolvedPath, cleanup, err := ocr.ResolvePath(e.Record)
@@ -123,7 +130,8 @@ func main() {
 						FilePath: resolvedPath,
 						FileType: e.Record.GetString("file_ext"),
 						OnComplete: func(ocrText string) {
-							classifierMgr.ClassifyAndAssign(e.Record.Id, ocrText)
+							classifierMgr.ClassifyAndAssign(e.Record.Id, ocrText, defaultSubID)
+							retrainQueue.OnDocumentOCRComplete(e.Record.Id, defaultSubID)
 						},
 					})
 					go func() {
@@ -139,13 +147,10 @@ func main() {
 					oldSub := e.Record.Original().GetString("subcategory_id")
 					newSub := e.Record.GetString("subcategory_id")
 					if oldSub != newSub && newSub != "" {
-						cfg, _ := shell.LoadConfig()
-						if newSub == cfg.DefaultSubcategoryID {
+						if newSub == defaultSubID {
 							return
 						}
-						if err := classifierMgr.Retrain(newSub); err != nil {
-							log.Printf("classifier: retrain error: %v", err)
-						}
+						retrainQueue.Enqueue(newSub)
 					}
 				}()
 				return e.Next()

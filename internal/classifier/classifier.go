@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/jbrukh/bayesian"
@@ -13,6 +12,15 @@ import (
 )
 
 const modelFileName = "classifier.model"
+
+// maxWordsPerClass limits how many distinct words each class learns.
+// Keeping this bounded prevents Laplace smoothing from penalising the class
+// too heavily for unknown words.
+const maxWordsPerClass = 100
+
+// confidenceThreshold is the minimum log-score difference required between
+// the best class and the second-best to accept an auto-classification.
+const confidenceThreshold = 0.5
 
 type ClassifierManager struct {
 	app        *pocketbase.PocketBase
@@ -42,7 +50,9 @@ func (m *ClassifierManager) Load() error {
 	return nil
 }
 
-func (m *ClassifierManager) ClassifyAndAssign(docID string, ocrText string) {
+// ClassifyAndAssign attempts to classify a document and assign it automatically.
+// It skips documents that already have a non-default subcategory (manual assignment).
+func (m *ClassifierManager) ClassifyAndAssign(docID string, ocrText string, defaultSubcategoryID string) {
 	if ocrText == "" {
 		return
 	}
@@ -60,7 +70,7 @@ func (m *ClassifierManager) ClassifyAndAssign(docID string, ocrText string) {
 		return
 	}
 
-	scores, inx, _ := c.LogScores(tokens)
+	scores, inx, strict := c.LogScores(tokens)
 
 	if inx < 0 || inx >= len(scores) {
 		return
@@ -85,8 +95,13 @@ func (m *ClassifierManager) ClassifyAndAssign(docID string, ocrText string) {
 		}
 	}
 
-	if len(scores) > 1 && (bestScore-secondBest) < 1.0 {
+	if len(scores) > 1 && (bestScore-secondBest) < confidenceThreshold {
 		log.Printf("classifier: uncertain classification (diff=%.2f) for %s, skipping", bestScore-secondBest, docID)
+		return
+	}
+
+	if !strict && len(scores) > 1 {
+		log.Printf("classifier: non-strict classification for %s, skipping", docID)
 		return
 	}
 
@@ -97,12 +112,19 @@ func (m *ClassifierManager) ClassifyAndAssign(docID string, ocrText string) {
 		return
 	}
 
-	log.Printf("classifier: document %s classified as %s (score=%.2f)", docID, subcategoryID, bestScore)
+	log.Printf("classifier: document %s classified as %s (score=%.2f, diff=%.2f)", docID, subcategoryID, bestScore, bestScore-secondBest)
 
 	err := m.app.RunInTransaction(func(txApp core.App) error {
 		doc, err := txApp.FindRecordById("documents", docID)
 		if err != nil {
 			return fmt.Errorf("document %s not found: %w", docID, err)
+		}
+
+		// Skip if the user already assigned a non-default subcategory manually.
+		currentSub := doc.GetString("subcategory_id")
+		if currentSub != "" && currentSub != defaultSubcategoryID {
+			log.Printf("classifier: document %s already manually assigned to %s, skipping auto-assign", docID, currentSub)
+			return nil
 		}
 
 		sub, err := txApp.FindRecordById("subcategories", subcategoryID)
@@ -119,89 +141,58 @@ func (m *ClassifierManager) ClassifyAndAssign(docID string, ocrText string) {
 	}
 }
 
-func (m *ClassifierManager) Retrain(subcategoryID string) error {
-	log.Printf("classifier: retraining model for subcategory %s", subcategoryID)
+// Retrain rebuilds the classifier from scratch using ALL subcategories that
+// have documents with OCR text. This keeps frequencies accurate and avoids
+// the vocabulary explosion caused by incremental Laplace smoothing.
+func (m *ClassifierManager) Retrain(triggerSubcategoryID string) error {
+	log.Printf("classifier: retraining model (triggered by %s)", triggerSubcategoryID)
 
-	docs, err := m.app.FindRecordsByFilter("documents",
-		"subcategory_id = {:sid} && ocr_txt != ''", "", -1, 0,
-		map[string]any{"sid": subcategoryID})
+	// Fetch all distinct subcategories that have at least one document with OCR text.
+	allDocs, err := m.app.FindRecordsByFilter("documents",
+		"ocr_txt != '' && subcategory_id != ''", "", -1, 0, nil)
 	if err != nil {
-		return fmt.Errorf("query documents for retrain: %w", err)
+		return fmt.Errorf("query all documents for retrain: %w", err)
 	}
 
-	if len(docs) == 0 {
-		log.Printf("classifier: no documents with OCR for %s, skipping", subcategoryID)
+	if len(allDocs) == 0 {
+		log.Printf("classifier: no documents with OCR found, skipping retrain")
 		return nil
 	}
 
-	ocrTexts := make([]string, len(docs))
-	for i, doc := range docs {
-		ocrTexts[i] = doc.GetString("ocr_txt")
+	// Group OCR texts by subcategory.
+	trainingData := make(map[string][]string)
+	for _, doc := range allDocs {
+		subID := doc.GetString("subcategory_id")
+		if subID == "" {
+			continue
+		}
+		trainingData[subID] = append(trainingData[subID], doc.GetString("ocr_txt"))
 	}
 
-	words := TopWords(ocrTexts, 1000)
-	if len(words) == 0 {
+	if len(trainingData) == 0 {
+		log.Printf("classifier: no training data after grouping, skipping retrain")
 		return nil
+	}
+
+	newC := rebuildClassifierFromData(trainingData, maxWordsPerClass, 2)
+	if newC == nil {
+		return fmt.Errorf("rebuild classifier returned nil")
 	}
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	c := m.classifier
-
-	if c == nil {
-		c = bayesian.NewClassifier(bayesian.Class(subcategoryID), bayesian.Class(defaultOtherClass))
-		c.Learn(words, bayesian.Class(subcategoryID))
-		c.Learn(Tokenize(spanishBaselineText), bayesian.Class(defaultOtherClass))
-	} else {
-		found := false
-		for _, cls := range c.Classes {
-			if string(cls) == subcategoryID {
-				found = true
-				break
-			}
-		}
-
-		trainingData := make(map[string][]string)
-		for _, cls := range c.Classes {
-			clsName := string(cls)
-			if clsName == defaultOtherClass {
-				continue
-			}
-			if clsName == subcategoryID {
-				trainingData[clsName] = ocrTexts
-			} else {
-				wm := c.WordsByClass(cls)
-				existingWords := make([]string, 0, len(wm))
-				for w := range wm {
-					existingWords = append(existingWords, w)
-				}
-				trainingData[clsName] = []string{strings.Join(existingWords, " ")}
-			}
-		}
-		if !found {
-			trainingData[subcategoryID] = ocrTexts
-		}
-
-		newC := rebuildClassifierFromData(trainingData, 1000)
-		if newC == nil {
-			return fmt.Errorf("rebuild classifier returned nil for %s", subcategoryID)
-		}
-		c = newC
-	}
-
-	m.classifier = c
+	m.classifier = newC
+	m.mu.Unlock()
 
 	path := filepath.Join(m.modelsDir, modelFileName)
-	if err := SaveModel(path, c); err != nil {
+	if err := SaveModel(path, newC); err != nil {
 		return fmt.Errorf("save model: %w", err)
 	}
 
-	log.Printf("classifier: model saved with %d classes (%d words for %s)", len(c.Classes), len(words), subcategoryID)
+	log.Printf("classifier: model saved with %d classes (%d subcategories trained)", len(newC.Classes), len(trainingData))
 	return nil
 }
 
-func rebuildClassifierFromData(trainingData map[string][]string, topN int) *bayesian.Classifier {
+func rebuildClassifierFromData(trainingData map[string][]string, topN int, minDocs int) *bayesian.Classifier {
 	if len(trainingData) == 0 {
 		return nil
 	}
@@ -210,20 +201,96 @@ func rebuildClassifierFromData(trainingData map[string][]string, topN int) *baye
 	for subcatID := range trainingData {
 		classNames = append(classNames, bayesian.Class(subcatID))
 	}
-	classNames = append(classNames, bayesian.Class("_other"))
+	classNames = append(classNames, bayesian.Class(defaultOtherClass))
 
 	c := bayesian.NewClassifier(classNames...)
 
 	for subcatID, docs := range trainingData {
-		words := TopWords(docs, topN)
+		// Adaptive minDocFreq: require words to appear in at least 2 documents
+		// only when we have 3+ training docs. Otherwise keep all words.
+		mdf := minDocs
+		if len(docs) < 3 {
+			mdf = 1
+		}
+		words := topWordsWithMinDocFreq(docs, topN, mdf)
 		if len(words) > 0 {
 			c.Learn(words, bayesian.Class(subcatID))
 		}
 	}
 
-	c.Learn(Tokenize(spanishBaselineText), bayesian.Class("_other"))
+	c.Learn(Tokenize(spanishBaselineText), bayesian.Class(defaultOtherClass))
 
 	return c
+}
+
+// topWordsWithMinDocFreq extracts the top N words that appear in at least
+// minDocs distinct documents. This removes hapax legomena (words appearing
+// only once) which are pure noise for Naive Bayes with Laplace smoothing.
+func topWordsWithMinDocFreq(docs []string, n int, minDocs int) []string {
+	if n <= 0 {
+		return nil
+	}
+
+	// Count in how many distinct documents each word appears.
+	docFreq := make(map[string]int)
+	for _, doc := range docs {
+		tokens := Tokenize(doc)
+		seen := make(map[string]bool)
+		for _, t := range tokens {
+			if !seen[t] {
+				docFreq[t]++
+				seen[t] = true
+			}
+		}
+	}
+
+	// Filter to words meeting minimum document frequency.
+	filtered := make(map[string]int)
+	for w, count := range docFreq {
+		if count >= minDocs {
+			filtered[w] = count
+		}
+	}
+
+	// Sort by frequency descending, then alphabetically.
+	list := make([]wc, 0, len(filtered))
+	for w, c := range filtered {
+		list = append(list, wc{w, c})
+	}
+
+	// If after filtering we have nothing but we have docs, fall back to
+	// regular TopWords so we don't end up with an empty class.
+	if len(list) == 0 && len(docs) > 0 {
+		return TopWords(docs, n)
+	}
+
+	// Sort descending by count
+	sortWords(list)
+
+	if n > len(list) {
+		n = len(list)
+	}
+	result := make([]string, n)
+	for i := 0; i < n; i++ {
+		result[i] = list[i].word
+	}
+	return result
+}
+
+type wc struct {
+	word  string
+	count int
+}
+
+func sortWords(list []wc) {
+	for i := 0; i < len(list); i++ {
+		for j := i + 1; j < len(list); j++ {
+			if list[j].count > list[i].count ||
+				(list[j].count == list[i].count && list[j].word < list[i].word) {
+				list[i], list[j] = list[j], list[i]
+			}
+		}
+	}
 }
 
 var spanishBaselineText = `
@@ -236,4 +303,29 @@ var spanishBaselineText = `
 	sistema aplicacion programa software hardware dispositivo equipo
 	servicio producto cliente usuario persona empresa organizacion
 	general especifico particular comun basico avanzado principal
+	calle ciudad pais provincia municipio comunidad region zona
+	nacional internacional local federal estatal publico privado
+	ministerio departamento division oficina secretaria direccion
+	gerencia administracion gestion coordinacion supervision
+	presidente director gerente jefe encargado responsable
+	empleado trabajador funcionario personal staff equipo
+	obra construccion edificio inmueble terreno solar parcela
+	vehiculo automovil motocicleta camion furgoneta ciclomotor
+	banco cuenta tarjeta credito debito prestamo hipoteca
+	seguro poliza cobertura siniestro reclamacion indemnizacion
+	hospital clinica medico enfermera paciente tratamiento diagnostico
+	colegio instituto universidad academia centro educativo
+	alumno estudiante profesor docente tutor maestro
+	asignatura materia curso ciclo modulo trimestre semestre
+	evaluacion examen prueba control ejercicio cuestionario
+	nota calificacion puntos porcentaje aprobado suspenso
+	ingreso egreso gasto ingreso presupuesto balance cuenta
+	impuesto tributo recargo recaudacion declaracion modelo
+	contrato acuerdo convenio pacto clausula anexo adhesion
+	orden pedido compra venta factura recibo albaran
+	solicitud demanda instancia recurso apelacion reclamacion
+	resolucion sentencia auto fallo dictamen providencia
+	diligencia acta certificado escritura testimonio copia
+	registro inscripcion anotacion asiento partida folio
+	libro registro archivo expediente carpeta legajo
 `
