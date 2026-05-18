@@ -12,11 +12,18 @@
 	import TrashIcon from "@lucide/svelte/icons/trash";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import MoreHorizontalIcon from "@lucide/svelte/icons/ellipsis";
+	import XIcon from "@lucide/svelte/icons/x";
+	import PlusIcon from "@lucide/svelte/icons/plus";
+	import SearchIcon from "@lucide/svelte/icons/search";
+	import CheckIcon from "@lucide/svelte/icons/check";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Separator } from "$lib/components/ui/separator/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
+	import * as Dialog from "$lib/components/ui/dialog/index.js";
+	import { Input } from "$lib/components/ui/input/index.js";
+	import { Label } from "$lib/components/ui/label/index.js";
 	import {
 		getDocument,
 		openDocument,
@@ -25,9 +32,14 @@
 		updateDocumentCategory,
 		deleteDocument,
 		getCategoriesWithSubcategories,
+		getFoldersForDocument,
+		removeDocumentFromFolder,
+		addDocumentToFolder,
+		getFolders,
+		createFolder,
 		type DocumentDetail,
 	} from "$lib/api";
-	import { formatBytes, formatDate } from "$lib/types";
+	import { FolderIcon, formatBytes, formatDate, type ExplorerFolder } from "$lib/types";
 
 
 	let doc = $state<DocumentDetail | null>(null);
@@ -37,6 +49,14 @@
 	let opened = $state(false);
 	let openCooldown = $state(false);
 	let textContent = $state("");
+	let docFolders = $state<{ id: string; name: string }[]>([]);
+	let showFolderDialog = $state(false);
+	let folderDialogQuery = $state("");
+	let folderList = $state<ExplorerFolder[]>([]);
+	let selectedFolderId = $state<string | "">("");
+	let creatingFolder = $state(false);
+	let newFolderName = $state("");
+	let newFolderParentId = $state<string | "">("");
 	let categories = $state<Awaited<ReturnType<typeof getCategoriesWithSubcategories>>>([]);
 
 	const id = $derived($page.params.id);
@@ -69,6 +89,7 @@
 	onMount(async () => {
 		await loadDocument();
 		getCategoriesWithSubcategories().then((cats) => { categories = cats; }).catch(() => {});
+		loadDocumentFolders();
 	});
 
 	async function loadDocument() {
@@ -136,6 +157,92 @@
 			setTimeout(() => goto("/"), 500);
 		} catch (err) {
 			toast.error(`Error al eliminar: ${err}`);
+		}
+	}
+
+	async function loadDocumentFolders() {
+		if (!id) return;
+		try {
+			docFolders = await getFoldersForDocument(id);
+		} catch (err) {
+			console.error("Failed to load document folders:", err);
+		}
+	}
+
+	async function handleRemoveFolder(folderId: string) {
+		if (!id) return;
+		try {
+			await removeDocumentFromFolder(id, folderId);
+			docFolders = docFolders.filter((f) => f.id !== folderId);
+			toast.success("Documento removido de la carpeta");
+		} catch (err) {
+			toast.error(`Error: ${err}`);
+		}
+	}
+
+	async function loadFolderList() {
+		try {
+			folderList = await getFolders();
+		} catch (err) {
+			console.error("Failed to load folders:", err);
+		}
+	}
+
+	function openFolderDialog() {
+		folderDialogQuery = "";
+		selectedFolderId = "";
+		creatingFolder = false;
+		newFolderName = "";
+		newFolderParentId = "";
+		showFolderDialog = true;
+		loadFolderList();
+	}
+
+	const visibleDialogFolders = $derived.by(() => {
+		const q = folderDialogQuery.trim().toLowerCase();
+		if (!q) return folderList;
+		return folderList.filter((f) => f.name.toLowerCase().includes(q));
+	});
+
+	function flattenFolders(folders: ExplorerFolder[], parentId: string | null = null, level = 0): { folder: ExplorerFolder; level: number }[] {
+		const result: { folder: ExplorerFolder; level: number }[] = [];
+		const items = folders.filter((f) => (parentId === null ? !f.parentId : f.parentId === parentId));
+		for (const f of items) {
+			result.push({ folder: f, level });
+			result.push(...flattenFolders(folders, f.id, level + 1));
+		}
+		return result;
+	}
+
+	async function handleAddToFolder() {
+		if (!selectedFolderId || !id) return;
+		try {
+			await addDocumentToFolder(id, selectedFolderId);
+			toast.success("Documento agregado a la carpeta");
+			showFolderDialog = false;
+			loadDocumentFolders();
+		} catch (err: any) {
+			if (err.message?.includes("duplicate") || err.message?.includes("unique")) {
+				toast.error("El documento ya está en esta carpeta");
+			} else {
+				toast.error(`Error: ${err}`);
+			}
+		}
+	}
+
+	async function handleCreateAndAdd() {
+		if (!newFolderName.trim() || !id) return;
+		try {
+			const folder = await createFolder(
+				newFolderName.trim(),
+				newFolderParentId || undefined,
+			);
+			await addDocumentToFolder(id, folder.id);
+			toast.success("Carpeta creada y documento agregado");
+			showFolderDialog = false;
+			loadDocumentFolders();
+		} catch (err) {
+			toast.error(`Error: ${err}`);
 		}
 	}
 </script>
@@ -263,6 +370,34 @@
 								<Badge variant="outline" class="capitalize">{doc.status}</Badge>
 							</div>
 						{/if}
+						<Separator />
+						<div class="flex flex-col gap-2">
+							<div class="flex items-center justify-between">
+								<span class="text-muted-foreground">Carpetas</span>
+								<Button variant="ghost" size="icon-xs" onclick={openFolderDialog}>
+									<PlusIcon class="size-3.5" />
+								</Button>
+							</div>
+							{#if docFolders.length === 0}
+								<span class="text-xs text-muted-foreground">Sin carpetas</span>
+							{:else}
+								<div class="flex flex-wrap gap-1">
+									{#each docFolders as folder (folder.id)}
+										<Badge variant="secondary" class="flex items-center gap-1 cursor-default">
+											<FolderIcon class="size-3" />
+											<span class="max-w-[120px] truncate">{folder.name}</span>
+											<button
+												aria-label="Remover de carpeta"
+												class="hover:text-destructive ml-0.5"
+												onclick={() => handleRemoveFolder(folder.id)}
+											>
+												<XIcon class="size-3" />
+											</button>
+										</Badge>
+									{/each}
+								</div>
+							{/if}
+						</div>
 						{#if doc.notes}
 							<Separator />
 							<div class="flex flex-col gap-1">
@@ -322,3 +457,95 @@
 		<div class="text-muted-foreground py-10 text-center">Documento no encontrado</div>
 	{/if}
 </div>
+
+<!-- Add to Folder Dialog -->
+<Dialog.Root open={showFolderDialog} onOpenChange={(o) => { showFolderDialog = o; if (!o) { creatingFolder = false; } }}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Agregar a carpeta</Dialog.Title>
+			<Dialog.Description>
+				Selecciona una carpeta para "{doc?.name}"
+			</Dialog.Description>
+		</Dialog.Header>
+		<div class="flex flex-col gap-4 py-4">
+			<div class="relative">
+				<SearchIcon class="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+				<Input
+					bind:value={folderDialogQuery}
+					placeholder="Buscar carpetas..."
+					class="pl-9"
+				/>
+			</div>
+
+			<div class="max-h-60 overflow-y-auto flex flex-col gap-1">
+				{#each flattenFolders(visibleDialogFolders) as { folder, level } (folder.id)}
+					{@const isAlreadyIn = docFolders.some((f) => f.id === folder.id)}
+					<button
+						type="button"
+						class="hover:bg-muted/50 data-[active=true]:bg-muted/80 flex w-full items-center justify-between gap-3 rounded-3xl px-3 py-2 text-left text-sm"
+						data-active={selectedFolderId === folder.id}
+						style="padding-left: {12 + level * 16}px"
+						disabled={isAlreadyIn}
+						onclick={() => { selectedFolderId = folder.id; }}
+					>
+						<div class="flex min-w-0 items-center gap-2">
+							<FolderIcon class="text-muted-foreground size-4 shrink-0" />
+							<span class="truncate">{folder.name}</span>
+						</div>
+						{#if isAlreadyIn}
+							<CheckIcon class="text-muted-foreground size-4 shrink-0" />
+						{/if}
+					</button>
+				{/each}
+				{#if visibleDialogFolders.length === 0}
+					<p class="text-muted-foreground py-4 text-center text-sm">No se encontraron carpetas</p>
+				{/if}
+			</div>
+
+			<Separator />
+
+			{#if !creatingFolder}
+				<Button variant="ghost" size="sm" class="justify-start" onclick={() => { creatingFolder = true; }}>
+					<PlusIcon class="mr-2 size-4" />
+					Crear nueva carpeta
+				</Button>
+			{:else}
+				<div class="flex flex-col gap-3 rounded-2xl border p-3">
+					<div class="flex flex-col gap-2">
+						<Label for="new-folder-name">Nombre</Label>
+						<Input id="new-folder-name" bind:value={newFolderName} placeholder="Nombre de la carpeta" />
+					</div>
+					<div class="flex flex-col gap-2">
+						<Label for="new-folder-parent">Carpeta padre (opcional)</Label>
+						<select
+							id="new-folder-parent"
+							bind:value={newFolderParentId}
+							class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-2xl border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+						>
+							<option value="">Ninguna (raíz)</option>
+							{#each folderList as f (f.id)}
+								<option value={f.id}>{f.name}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="flex gap-2 justify-end">
+						<Button variant="outline" size="sm" onclick={() => { creatingFolder = false; }}>
+							Cancelar
+						</Button>
+						<Button size="sm" onclick={handleCreateAndAdd} disabled={!newFolderName.trim()}>
+							Crear y agregar
+						</Button>
+					</div>
+				</div>
+			{/if}
+		</div>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => { showFolderDialog = false; }}>
+				Cancelar
+			</Button>
+			<Button onclick={handleAddToFolder} disabled={!selectedFolderId}>
+				Agregar
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
