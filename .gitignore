@@ -5,5 +5,5 @@ ocr-server/*.egg-info/
 ocr-server/.pytest_cache/
 pb_data/
 *.exe
-.opencode
-.vscode
+.opencode/*
+.vscode/
